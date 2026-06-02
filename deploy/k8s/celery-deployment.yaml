@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowflow-celery
+  namespace: knowflow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: knowflow-celery
+  template:
+    metadata:
+      labels:
+        app: knowflow-celery
+    spec:
+      containers:
+        - name: celery-worker
+          image: knowflow-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: knowflow-config
+            - secretRef:
+                name: knowflow-secret
+          env:
+            - name: RUN_MIGRATIONS_ON_START
+              value: "false"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - app.core.celery_app
+                - inspect
+                - ping
+            initialDelaySeconds: 90
+            periodSeconds: 60
+            timeoutSeconds: 15

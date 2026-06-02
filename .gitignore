@@ -1,0 +1,50 @@
+# Environment — never commit secrets
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+
+# Node / frontend build
+node_modules/
+dist/
+build/
+.cache/
+
+# IDE / editor
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+postgres_data/
+redis_data/
+
+# Uploads & vector local data
+uploads/
+chroma_data/
+
+# Playwright / test artifacts
+playwright-report/
+test-results/
+frontend/test-results/
+
+# Alembic bytecode
+alembic/versions/*.pyc
+
+# K8s secrets (use secret.yaml.example only)
+deploy/k8s/secret.yaml

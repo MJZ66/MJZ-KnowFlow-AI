@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowflow-config
+  namespace: knowflow
+data:
+  APP_ENV: "production"
+  TASK_BACKEND: "celery"
+  VECTOR_PROVIDER: "chroma_hash"
+  EMBEDDING_PROVIDER: "hash"
+  HYBRID_SEARCH_ENABLED: "true"
+  RAG_CACHE_ENABLED: "true"
+  RAG_CACHE_TTL_SECONDS: "600"
+  CHROMA_HOST: "chromadb"
+  CHROMA_PORT: "8000"
+  REDIS_URL: "redis://redis:6379/0"
+  DATABASE_URL: "postgresql+asyncpg://knowflow:knowflow_secret@postgres:5432/knowflow"
+  DATABASE_URL_SYNC: "postgresql+psycopg2://knowflow:knowflow_secret@postgres:5432/knowflow"
+  ALLOWED_ORIGINS: "https://your-domain.com"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "10"
+  CELERY_WORKER_CONCURRENCY: "4"
+  METRICS_ENABLED: "true"

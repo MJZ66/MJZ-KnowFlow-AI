@@ -1,0 +1,35 @@
+# Example Ingress with TLS — replace host and secret names before apply.
+# Requires an Ingress controller (nginx, traefik, etc.) in the cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: knowflow-ingress
+  namespace: knowflow
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - knowflow.example.com
+      secretName: knowflow-tls
+  rules:
+    - host: knowflow.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: knowflow-backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: knowflow-frontend
+                port:
+                  number: 80

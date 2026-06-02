@@ -1,0 +1,204 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: knowflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-knowflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-knowflow_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-knowflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-knowflow} -d ${POSTGRES_DB:-knowflow}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: knowflow-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: knowflow-chromadb
+    restart: unless-stopped
+    ports:
+      - "${CHROMA_PORT:-8001}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: knowflow-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-knowflow}:${POSTGRES_PASSWORD:-knowflow_secret}@postgres:5432/${POSTGRES_DB:-knowflow}
+      - REDIS_URL=redis://redis:6379/0
+      - TASK_BACKEND=${TASK_BACKEND:-celery}
+      - RAG_CACHE_ENABLED=${RAG_CACHE_ENABLED:-false}
+      - RAG_CACHE_TTL_SECONDS=${RAG_CACHE_TTL_SECONDS:-300}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - SECRET_KEY=${SECRET_KEY}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - LLM_PROVIDER=${LLM_PROVIDER:-qwen}
+      - LLM_API_BASE=${LLM_API_BASE}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-qwen-plus}
+      - VECTOR_PROVIDER=${VECTOR_PROVIDER:-chroma_hash}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-hash}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - RERANKER_ENABLED=${RERANKER_ENABLED:-false}
+      - RERANKER_PROVIDER=${RERANKER_PROVIDER:-none}
+      - RERANKER_TOP_N=${RERANKER_TOP_N:-5}
+      - RETRIEVAL_OVERSAMPLE=${RETRIEVAL_OVERSAMPLE:-4}
+      - HYBRID_SEARCH_ENABLED=${HYBRID_SEARCH_ENABLED:-false}
+      - HYBRID_VECTOR_WEIGHT=${HYBRID_VECTOR_WEIGHT:-0.7}
+      - HYBRID_KEYWORD_WEIGHT=${HYBRID_KEYWORD_WEIGHT:-0.3}
+      - KEYWORD_TOP_K=${KEYWORD_TOP_K:-20}
+      - VECTOR_TOP_K=${VECTOR_TOP_K:-20}
+      - APP_ENV=${APP_ENV:-development}
+      - RUN_MIGRATIONS_ON_START=${RUN_MIGRATIONS_ON_START:-true}
+      - DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-knowflow}:${POSTGRES_PASSWORD:-knowflow_secret}@postgres:5432/${POSTGRES_DB:-knowflow}
+      - DEEPSEEK_API_BASE=${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_VECTOR_INDEX_PREFIX=${DEEPSEEK_VECTOR_INDEX_PREFIX:-kb_}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/uploads}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-30}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: knowflow-celery-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-knowflow}:${POSTGRES_PASSWORD:-knowflow_secret}@postgres:5432/${POSTGRES_DB:-knowflow}
+      - DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-knowflow}:${POSTGRES_PASSWORD:-knowflow_secret}@postgres:5432/${POSTGRES_DB:-knowflow}
+      - REDIS_URL=redis://redis:6379/0
+      - TASK_BACKEND=celery
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - SECRET_KEY=${SECRET_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-qwen}
+      - LLM_API_BASE=${LLM_API_BASE}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-qwen-plus}
+      - VECTOR_PROVIDER=${VECTOR_PROVIDER:-chroma_hash}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-hash}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - RERANKER_ENABLED=${RERANKER_ENABLED:-false}
+      - HYBRID_SEARCH_ENABLED=${HYBRID_SEARCH_ENABLED:-false}
+      - APP_ENV=${APP_ENV:-development}
+      - RUN_MIGRATIONS_ON_START=false
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/uploads}
+      - DEEPSEEK_API_BASE=${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    volumes:
+      - uploads_data:/app/uploads
+    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: knowflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+  nginx:
+    image: nginx:alpine
+    container_name: knowflow-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    name: knowflow_postgres_data
+  redis_data:
+    name: knowflow_redis_data
+  chroma_data:
+    name: knowflow_chroma_data
+  uploads_data:
+    name: knowflow_uploads_data

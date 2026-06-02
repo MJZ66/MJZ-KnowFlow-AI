@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #334155;
+    border-radius: 3px;
+  }
+
+  body {
+    @apply bg-surface-950 text-surface-100;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-500 text-white font-medium px-4 py-2 rounded-lg
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-brand-500/50;
+  }
+  .btn-secondary {
+    @apply bg-surface-800 hover:bg-surface-700 text-surface-200 font-medium px-4 py-2 rounded-lg
+           border border-surface-700 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-surface-500/50;
+  }
+  .btn-ghost {
+    @apply hover:bg-surface-800/50 text-surface-300 font-medium px-3 py-2 rounded-lg
+           transition-all duration-200;
+  }
+  .btn-danger {
+    @apply bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium px-4 py-2 rounded-lg
+           border border-red-600/30 transition-all duration-200;
+  }
+  .input-field {
+    @apply w-full bg-surface-900 border border-surface-700 rounded-lg px-4 py-2.5
+           text-surface-100 placeholder:text-surface-500
+           focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500
+           transition-all duration-200;
+  }
+  .card {
+    @apply bg-surface-900 border border-surface-800 rounded-xl p-6
+           hover:border-surface-700 transition-all duration-200;
+  }
+  .glass-panel {
+    @apply bg-surface-900/80 backdrop-blur-xl border border-surface-800/50 rounded-xl;
+  }
+}
