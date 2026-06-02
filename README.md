@@ -12,7 +12,7 @@
 | `npm run test:run` | 12 passed |
 | `npm run e2e` | 2 passed（自动拉起 dev server） |
 
-完整部署与开发说明见 **[docs/zh/README.md](docs/zh/README.md)**（分章索引），单页汇总见 [docs/DEPLOYMENT_AND_DEVELOPMENT.md](docs/DEPLOYMENT_AND_DEVELOPMENT.md)，K8s 见 **[deploy/README.md](deploy/README.md)**。
+完整部署与开发说明见 **[docs/zh/README.md](docs/zh/README.md)**（分章索引）；**最短部署**见 [docs/zh/16-最短部署清单.md](docs/zh/16-最短部署清单.md)；K8s 见 **[deploy/README.md](deploy/README.md)**。
 
 ## 技术栈
 
