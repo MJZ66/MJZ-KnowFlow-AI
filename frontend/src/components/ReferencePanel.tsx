@@ -41,7 +41,7 @@ export default function ReferencePanel({ references, onReferenceClick }: Props) 
 
   return (
     <div className="p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-surface-300 flex items-center gap-2">
+      <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 flex items-center gap-2">
         <Hash className="w-4 h-4" />
         {t('chat.references')} ({references.length})
       </h3>
@@ -57,10 +57,10 @@ export default function ReferencePanel({ references, onReferenceClick }: Props) 
             data-testid={`reference-card-${i}`}
             onClick={() => onReferenceClick?.(ref)}
             disabled={!onReferenceClick || !ref.document_id}
-            className={`w-full text-left bg-surface-800/50 border border-surface-700/50 rounded-lg p-3 space-y-1.5 transition-colors ${
+            className={`w-full text-left bg-white border border-surface-200 rounded-xl p-3 space-y-1.5 transition-all duration-200 dark:bg-surface-900/80 dark:border-surface-700/60 ${
               onReferenceClick && ref.document_id
-                ? 'hover:border-brand-500/40 hover:bg-surface-800 cursor-pointer'
-                : 'hover:border-surface-600/50'
+                ? 'hover:border-brand-500/35 hover:bg-surface-50 hover:shadow-sm cursor-pointer dark:hover:bg-surface-800/90'
+                : 'hover:border-surface-300 dark:hover:border-surface-600/50'
             }`}
           >
             {/* Header: filename + score */}

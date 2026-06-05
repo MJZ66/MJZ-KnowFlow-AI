@@ -21,7 +21,7 @@ export default function LangSwitcher({ testId = 'lang-switcher' }: Props) {
       type="button"
       data-testid={testId}
       onClick={toggle}
-      className="btn-ghost text-xs flex items-center gap-1.5 px-2.5 py-1.5"
+      className="btn-ghost text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-surface-300/80 dark:border-surface-700/80 bg-white/70 dark:bg-surface-900/50"
       title={t('lang.switch')}
     >
       <Languages className="w-3.5 h-3.5" />

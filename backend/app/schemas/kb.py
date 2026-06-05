@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class KBCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
-    visibility: str = Field(default="private")  # private, team, public
+    visibility: str = Field(default="private")
 
 
 class KBUpdate(BaseModel):
@@ -24,6 +24,11 @@ class KBResponse(BaseModel):
     name: str
     description: str
     visibility: str
+    publish_status: str = "none"
+    publish_requested_at: Optional[datetime] = None
+    publish_reviewed_at: Optional[datetime] = None
+    publish_review_note: Optional[str] = None
+    owner_username: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -37,9 +42,24 @@ class PaginatedKBList(BaseModel):
     limit: int
 
 
+class PublishReviewRequest(BaseModel):
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class KBPublishRequestItem(BaseModel):
+    id: int
+    user_id: int
+    owner_username: str
+    owner_email: str
+    name: str
+    description: str
+    publish_requested_at: Optional[str] = None
+    created_at: str
+
+
 class MemberAdd(BaseModel):
     user_id: int
-    role: str = Field(default="viewer")  # owner, editor, viewer
+    role: str = Field(default="viewer")
 
 
 class MemberResponse(BaseModel):

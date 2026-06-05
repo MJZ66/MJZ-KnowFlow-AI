@@ -137,6 +137,22 @@ class Settings(BaseSettings):
     # ============================================
     METRICS_ENABLED: bool = True
 
+    # ============================================
+    # Admin bootstrap & presence
+    # ============================================
+    SEED_ADMIN_ON_START: bool = True
+    ADMIN_EMAIL: str = "admin@knowflow.local"
+    ADMIN_USERNAME: str = "knowflow_admin"
+    ADMIN_PASSWORD: str = "Admin@KnowFlow2026"
+    SEED_ADMIN_UPDATE_PASSWORD: bool = False
+    USER_ONLINE_THRESHOLD_MINUTES: int = 5
+
+    PROMOTE_USER_ON_START: bool = True
+    PROMOTE_USER_EMAIL: str = ""
+    PROMOTE_USER_USERNAME: str = ""
+    PROMOTE_USER_PASSWORD: str = ""
+    PROMOTE_USER_ROLE: str = "admin"
+
     model_config = dict(
         env_file=".env",
         env_file_encoding="utf-8",

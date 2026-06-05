@@ -32,9 +32,14 @@ interface KBState {
   members: KBMember[];
   isLoading: boolean;
 
+  publicKbs: KnowledgeBase[];
+  publicKbTotal: number;
+
   fetchKBs: (skip?: number, limit?: number) => Promise<PaginatedKBList>;
+  fetchPublicKBs: (skip?: number, limit?: number) => Promise<PaginatedKBList>;
   fetchKB: (id: number) => Promise<KnowledgeBase>;
-  createKB: (name: string, description: string, visibility: string) => Promise<KnowledgeBase>;
+  createKB: (name: string, description: string, visibility?: string) => Promise<KnowledgeBase>;
+  requestPublish: (id: number) => Promise<KnowledgeBase>;
   updateKB: (id: number, data: Partial<KnowledgeBase>) => Promise<void>;
   deleteKB: (id: number) => Promise<void>;
   fetchMembers: (kbId: number) => Promise<void>;
@@ -48,6 +53,8 @@ export const useKBStore = create<KBState>((set, get) => ({
   kbTotal: 0,
   kbSkip: 0,
   kbLimit: 12,
+  publicKbs: [],
+  publicKbTotal: 0,
   currentKB: null,
   members: [],
   isLoading: false,
@@ -75,7 +82,14 @@ export const useKBStore = create<KBState>((set, get) => ({
     return kb;
   },
 
-  createKB: async (name, description, visibility) => {
+  fetchPublicKBs: async (skip = 0, limit = 50) => {
+    const raw = await api<unknown>(`/api/kbs/public/catalog?skip=${skip}&limit=${limit}`);
+    const page = normalizeKBList(raw);
+    set({ publicKbs: page.items, publicKbTotal: page.total });
+    return page;
+  },
+
+  createKB: async (name, description, visibility = 'private') => {
     const kb = await api<KnowledgeBase>('/api/kbs', {
       method: 'POST',
       body: JSON.stringify({ name, description, visibility }),
@@ -96,6 +110,15 @@ export const useKBStore = create<KBState>((set, get) => ({
       kbs: s.kbs.map((k) => (k.id === id ? kb : k)),
       currentKB: s.currentKB?.id === id ? kb : s.currentKB,
     }));
+  },
+
+  requestPublish: async (id) => {
+    const kb = await api<KnowledgeBase>(`/api/kbs/${id}/publish-request`, { method: 'POST' });
+    set((s) => ({
+      kbs: s.kbs.map((k) => (k.id === id ? kb : k)),
+      currentKB: s.currentKB?.id === id ? kb : s.currentKB,
+    }));
+    return kb;
   },
 
   deleteKB: async (id) => {

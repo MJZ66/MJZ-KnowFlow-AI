@@ -97,11 +97,11 @@ export default function DocumentPreviewPanel({
   return (
     <div className="fixed inset-0 z-50 flex justify-end" data-testid="document-preview-panel">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
-      <aside className="relative w-full max-w-lg h-full bg-surface-900 border-l border-surface-700 flex flex-col shadow-xl">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800">
+      <aside className="relative w-full max-w-lg h-full bg-white dark:bg-surface-900 border-l border-surface-200 dark:border-surface-700 flex flex-col shadow-xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200 dark:border-surface-800">
           <div className="flex items-center gap-2 min-w-0">
-            <FileText className="w-5 h-5 text-brand-400 shrink-0" />
-            <h2 className="text-sm font-semibold text-surface-100 truncate">
+            <FileText className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0" />
+            <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">
               {t('preview.title')}
             </h2>
           </div>
@@ -131,7 +131,7 @@ export default function DocumentPreviewPanel({
           {!loading && !error && data && (
             <>
               <div className="mb-4 space-y-2">
-                <p className="text-sm font-medium text-surface-200 truncate">{data.filename}</p>
+                <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{data.filename}</p>
                 <DocumentStatusBadge status={data.status as DocumentStatus} />
               </div>
 
@@ -146,8 +146,8 @@ export default function DocumentPreviewPanel({
                       data-testid={`preview-chunk-${chunk.id}`}
                       className={`rounded-lg border p-3 transition-colors ${
                         highlightId === chunk.id
-                          ? 'border-brand-400 bg-brand-500/10 ring-1 ring-brand-400/50'
-                          : 'border-surface-700 bg-surface-800/40'
+                          ? 'border-brand-500 bg-brand-500/10 ring-1 ring-brand-400/50'
+                          : 'border-surface-200 bg-surface-50 dark:border-surface-700 dark:bg-surface-800/40'
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs text-surface-400 mb-2">
@@ -159,7 +159,7 @@ export default function DocumentPreviewPanel({
                       {chunk.section_title && (
                         <p className="text-xs text-surface-500 mb-1 truncate">{chunk.section_title}</p>
                       )}
-                      <p className="text-sm text-surface-300 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap leading-relaxed">
                         {chunk.content}
                       </p>
                     </div>

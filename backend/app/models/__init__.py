@@ -44,6 +44,13 @@ class Visibility(str, enum.Enum):
     PUBLIC = "public"
 
 
+class PublishStatus(str, enum.Enum):
+    NONE = "none"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class MemberRole(str, enum.Enum):
     OWNER = "owner"
     EDITOR = "editor"
@@ -86,9 +93,15 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    last_active_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     # Relationships
-    knowledge_bases = relationship("KnowledgeBase", back_populates="owner")
+    knowledge_bases = relationship(
+        "KnowledgeBase",
+        back_populates="owner",
+        foreign_keys="KnowledgeBase.user_id",
+    )
     documents = relationship("Document", back_populates="uploader")
     chat_sessions = relationship("ChatSession", back_populates="user")
     chat_messages = relationship("ChatMessage", back_populates="user")
@@ -107,11 +120,17 @@ class KnowledgeBase(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, default="")
     visibility = Column(Enum(Visibility), default=Visibility.PRIVATE, nullable=False)
+    publish_status = Column(Enum(PublishStatus), default=PublishStatus.NONE, nullable=False)
+    publish_requested_at = Column(DateTime(timezone=True), nullable=True)
+    publish_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    publish_review_note = Column(Text, nullable=True)
+    publish_reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
 
     # Relationships
-    owner = relationship("User", back_populates="knowledge_bases")
+    owner = relationship("User", back_populates="knowledge_bases", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[publish_reviewed_by])
     members = relationship("KnowledgeBaseMember", back_populates="knowledge_base", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="knowledge_base", cascade="all, delete-orphan")
     document_chunks = relationship("DocumentChunk", back_populates="knowledge_base", cascade="all, delete-orphan")

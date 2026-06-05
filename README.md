@@ -42,6 +42,7 @@ copy .env.example .env
 
 ```powershell
 docker compose up --build -d
+# 或一键部署+验收: .\deploy_all.ps1
 # 或仅后端: docker compose up --build -d backend celery-worker
 ```
 

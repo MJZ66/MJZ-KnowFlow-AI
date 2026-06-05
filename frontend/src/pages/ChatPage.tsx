@@ -10,6 +10,7 @@ import SessionList from '../components/SessionList';
 import ChatInput from '../components/ChatInput';
 import ReferencePanel from '../components/ReferencePanel';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import ThemeSwitcher from '../components/ThemeSwitcher';
 import { parseApiError } from '../utils/error';
 import type { ChatSession, ChatMessage } from '../types';
 
@@ -68,8 +69,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-surface-950">
-      <header className="h-14 border-b border-surface-800 flex items-center px-4 gap-4 shrink-0 bg-surface-950/80 backdrop-blur-xl">
+    <div className="h-screen flex flex-col page-bg overflow-hidden">
+      <header className="h-14 border-b border-surface-200 dark:border-surface-800 flex items-center px-4 gap-4 shrink-0 glass-panel rounded-none">
         <button onClick={() => navigate(`/kbs/${kbIdNum}`)} className="btn-ghost p-1.5" title={t('common.back')}>
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -78,6 +79,7 @@ export default function ChatPage() {
           <h2 className="font-semibold text-surface-200 truncate">{currentKB?.name || t('common.loading')}</h2>
         </div>
         <div className="flex-1" />
+        <ThemeSwitcher />
         <button onClick={() => setShowRefs(!showRefs)} className="btn-ghost p-1.5" title={showRefs ? t('chat.hideRefs') : t('chat.showRefs')}>
           {showRefs ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
         </button>
@@ -85,7 +87,7 @@ export default function ChatPage() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar */}
-        <div className="w-64 border-r border-surface-800 shrink-0 hidden md:block">
+        <div className="w-64 border-r border-surface-200 dark:border-surface-800 shrink-0 hidden md:block bg-surface-50/80 dark:bg-transparent">
           <SessionList
             sessions={sessions}
             currentSessionId={currentSession?.id || null}
@@ -154,7 +156,7 @@ export default function ChatPage() {
 
         {/* Right references */}
         {showRefs && (
-          <div className="w-72 border-l border-surface-800 shrink-0 hidden lg:block overflow-y-auto">
+          <div className="w-72 border-l border-surface-200 dark:border-surface-800 shrink-0 hidden lg:block overflow-y-auto bg-surface-50/80 dark:bg-transparent">
             <ReferencePanel references={references} />
           </div>
         )}

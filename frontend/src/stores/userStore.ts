@@ -10,6 +10,7 @@ interface UserState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, username: string) => Promise<void>;
   fetchMe: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -53,6 +54,16 @@ export const useUserStore = create<UserState>((set) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    await api<{ message: string }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
   },
 
   logout: () => {

@@ -32,8 +32,10 @@ export default function SessionList({ sessions, currentSessionId, onSelect, onCr
           <p className="text-surface-500 text-sm text-center py-8">{t('chat.noSessions')}</p>
         )}
         {sessions.map((s) => (
-          <div key={s.id} className={`group flex items-center rounded-lg transition-all duration-150 ${
-            s.id === currentSessionId ? 'bg-brand-500/10 border border-brand-500/20' : 'hover:bg-surface-800 border border-transparent'
+          <div key={s.id} className={`group flex items-center rounded-xl transition-all duration-200 ${
+            s.id === currentSessionId
+              ? 'bg-brand-500/12 border border-brand-500/30 shadow-sm'
+              : 'hover:bg-surface-800/80 border border-transparent'
           }`}>
             <button onClick={() => onSelect(s)} className="flex items-center gap-2 flex-1 px-3 py-2 text-left min-w-0">
               <MessageSquare className="w-4 h-4 shrink-0 text-surface-500" />

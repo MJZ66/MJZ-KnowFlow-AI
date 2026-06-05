@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, BookOpen, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, BookOpen, Settings, LogOut, ChevronLeft, ChevronRight, User, Lock, Globe } from 'lucide-react';
 import { useUserStore } from '../stores/userStore';
 import { useKBStore } from '../stores/kbStore';
 import KnowledgeBaseCard from '../components/KnowledgeBaseCard';
-import LangSwitcher from '../components/LangSwitcher';
+import AppShell from '../components/AppShell';
+import TabPanel from '../components/TabPanel';
 
 const PAGE_SIZE_OPTIONS = [6, 12, 24];
 
@@ -13,8 +14,10 @@ export default function DashboardPage() {
   const { t } = useTranslation();
   const user = useUserStore((s) => s.user);
   const logout = useUserStore((s) => s.logout);
-  const { kbs, kbTotal, isLoading, fetchKBs, createKB } = useKBStore();
+  const { kbs, kbTotal, isLoading, fetchKBs, fetchPublicKBs, publicKbs, publicKbTotal, createKB } = useKBStore();
   const navigate = useNavigate();
+  const [listTab, setListTab] = useState<'mine' | 'public'>('mine');
+  const [publicLoading, setPublicLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -30,9 +33,17 @@ export default function DashboardPage() {
   }, [fetchKBs]);
 
   useEffect(() => {
-    loadPage(0, pageSize);
+    if (listTab === 'mine') {
+      loadPage(0, pageSize);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchKBs]);
+  }, [fetchKBs, listTab]);
+
+  useEffect(() => {
+    if (listTab !== 'public') return;
+    setPublicLoading(true);
+    fetchPublicKBs(0, 50).finally(() => setPublicLoading(false));
+  }, [listTab, fetchPublicKBs]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -47,165 +58,220 @@ export default function DashboardPage() {
   const rangeEnd = Math.min((page + 1) * pageSize, kbTotal);
 
   return (
-    <div className="min-h-screen bg-surface-950">
-      <header className="border-b border-surface-800 bg-surface-950/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-brand-400" />
-            </div>
-            <h1 className="text-lg font-bold text-surface-100">{t('app.name')}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <LangSwitcher />
-            <span className="text-sm text-surface-400">{user?.username}</span>
-            {user?.role !== 'user' && (
-              <button onClick={() => navigate('/admin')} className="btn-ghost p-2" title={t('admin.title')}>
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
-            <button onClick={logout} className="btn-ghost p-2 text-red-400" title={t('auth.logout')}>
-              <LogOut className="w-4 h-4" />
+    <AppShell
+      userLabel={user?.username}
+      actions={
+        <>
+          <button
+            type="button"
+            data-testid="nav-account"
+            onClick={() => navigate('/account')}
+            className="btn-ghost p-2"
+            title={t('account.title')}
+          >
+            <User className="w-4 h-4" />
+          </button>
+          {user?.role !== 'user' && (
+            <button onClick={() => navigate('/admin')} className="btn-ghost p-2" title={t('admin.title')}>
+              <Settings className="w-4 h-4" />
             </button>
-          </div>
+          )}
+          <button onClick={logout} className="btn-ghost p-2 text-red-400/90 hover:text-red-400" title={t('auth.logout')}>
+            <LogOut className="w-4 h-4" />
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 animate-fade-up">
+        <div>
+          <p className="section-label mb-2">{t('kb.myList')}</p>
+          <h2 className="font-display text-3xl font-semibold text-surface-900 dark:text-surface-100">{t('kb.myList')}</h2>
+          <p className="text-surface-500 mt-2 max-w-lg">
+            {listTab === 'mine' ? t('kb.privateSubtitle') : t('kb.publicSubtitle')}
+          </p>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-surface-100">{t('kb.myList')}</h2>
-            <p className="text-surface-500 mt-1">{t('kb.listSubtitle')}</p>
-          </div>
+        {listTab === 'mine' && (
           <button
             type="button"
             data-testid="kb-create-open"
             onClick={() => setShowCreate(true)}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex items-center gap-2 shrink-0 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             {t('kb.create')}
           </button>
-        </div>
+        )}
+      </div>
 
-        {showCreate && (
-          <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="card w-full max-w-md space-y-4" data-testid="kb-create-modal">
-              <h3 className="text-lg font-semibold text-surface-100">{t('kb.create')}</h3>
-              <input
-                data-testid="kb-create-name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="input-field"
-                placeholder={t('kb.name')}
-                autoFocus
-              />
-              <textarea
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                className="input-field resize-none"
-                rows={3}
-                placeholder={t('kb.descriptionPlaceholder')}
-              />
-              <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="kb-create-submit"
-                  onClick={handleCreate}
-                  className="btn-primary"
-                  disabled={!newName.trim()}
-                >
-                  {t('common.confirm')}
-                </button>
-              </div>
+      <div className="admin-tabs mb-8">
+        <button
+          type="button"
+          data-testid="dashboard-tab-mine"
+          onClick={() => setListTab('mine')}
+          className={listTab === 'mine' ? 'admin-tab-active' : 'admin-tab'}
+        >
+          <Lock className="w-4 h-4" />
+          {t('kb.tabPrivate')}
+        </button>
+        <button
+          type="button"
+          data-testid="dashboard-tab-public"
+          onClick={() => setListTab('public')}
+          className={listTab === 'public' ? 'admin-tab-active' : 'admin-tab'}
+        >
+          <Globe className="w-4 h-4" />
+          {t('kb.tabPublic')}
+        </button>
+      </div>
+
+      {showCreate && (
+        <div
+          className="modal-backdrop fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowCreate(false)}
+        >
+          <div
+            className="modal-panel card w-full max-w-md space-y-4 shadow-glow border-brand-600/20"
+            data-testid="kb-create-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-xl font-semibold text-surface-100">{t('kb.create')}</h3>
+            <input
+              data-testid="kb-create-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="input-field"
+              placeholder={t('kb.name')}
+              autoFocus
+            />
+            <textarea
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              className="input-field resize-none"
+              rows={3}
+              placeholder={t('kb.descriptionPlaceholder')}
+            />
+            <div className="flex gap-3 justify-end pt-1">
+              <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="kb-create-submit"
+                onClick={handleCreate}
+                className="btn-primary"
+                disabled={!newName.trim()}
+              >
+                {t('common.confirm')}
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <TabPanel panelKey={listTab}>
+      {listTab === 'public' ? (
+        publicLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="card animate-pulse">
-                <div className="w-10 h-10 rounded-lg bg-surface-800 mb-3" />
-                <div className="h-5 bg-surface-800 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-surface-800 rounded w-full" />
+              <div key={i} className="card animate-pulse h-32" />
+            ))}
+          </div>
+        ) : publicKbs.length === 0 ? (
+          <div className="card p-12 text-center text-surface-500 text-sm">{t('kb.publicEmpty')}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {publicKbs.map((kb) => (
+              <KnowledgeBaseCard key={kb.id} kb={kb} showOwner onClick={() => navigate(`/kbs/${kb.id}`)} />
+            ))}
+          </div>
+        )
+      ) : isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card animate-pulse">
+              <div className="w-10 h-10 rounded-lg bg-surface-800 mb-3" />
+              <div className="h-5 bg-surface-800 rounded w-3/4 mb-2" />
+              <div className="h-4 bg-surface-800 rounded w-full" />
+            </div>
+          ))}
+        </div>
+      ) : kbs.length === 0 && kbTotal === 0 ? (
+        <div className="text-center py-24 card max-w-lg mx-auto border-dashed border-surface-700">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-5">
+            <BookOpen className="w-8 h-8 text-brand-400" />
+          </div>
+            <h3 className="font-display text-xl font-semibold text-surface-800 dark:text-surface-200 mb-2">{t('kb.empty')}</h3>
+          <p className="text-surface-500 mb-8 text-sm leading-relaxed">{t('kb.emptyHint')}</p>
+          <button type="button" onClick={() => setShowCreate(true)} className="btn-primary">
+            {t('kb.createFirst')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {kbs.map((kb, idx) => (
+              <div key={kb.id} className={`animate-fade-up stagger-${Math.min(idx + 1, 3)}`}>
+                <KnowledgeBaseCard kb={kb} onClick={() => navigate(`/kbs/${kb.id}`)} />
               </div>
             ))}
           </div>
-        ) : kbs.length === 0 && kbTotal === 0 ? (
-          <div className="text-center py-20">
-            <BookOpen className="w-16 h-16 mx-auto text-surface-700 mb-4" />
-            <h3 className="text-xl font-semibold text-surface-300 mb-2">{t('kb.empty')}</h3>
-            <p className="text-surface-500 mb-6">{t('kb.emptyHint')}</p>
-            <button type="button" onClick={() => setShowCreate(true)} className="btn-primary">
-              {t('kb.createFirst')}
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {kbs.map((kb) => (
-                <KnowledgeBaseCard key={kb.id} kb={kb} onClick={() => navigate(`/kbs/${kb.id}`)} />
-              ))}
-            </div>
 
-            {kbTotal > 0 && (
-              <div
-                className="flex flex-wrap items-center justify-between gap-4 mt-8 pt-4 border-t border-surface-800"
-                data-testid="kb-pagination"
-              >
-                <p className="text-sm text-surface-500">
-                  {t('pagination.range', { start: rangeStart, end: rangeEnd, total: kbTotal })}
-                </p>
-                <div className="flex items-center gap-3">
-                  <label className="text-xs text-surface-500 flex items-center gap-2">
-                    {t('pagination.pageSize')}
-                    <select
-                      data-testid="kb-page-size"
-                      className="input-field py-1 px-2 text-sm w-auto"
-                      value={pageSize}
-                      onChange={(e) => {
-                        const size = Number(e.target.value);
-                        loadPage(0, size);
-                      }}
-                    >
-                      {PAGE_SIZE_OPTIONS.map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    data-testid="kb-page-prev"
-                    className="btn-ghost p-2 disabled:opacity-40"
-                    disabled={page === 0}
-                    onClick={() => loadPage(page - 1, pageSize)}
-                    aria-label={t('pagination.prev')}
+          {listTab === 'mine' && kbTotal > 0 && (
+            <div
+              className="flex flex-wrap items-center justify-between gap-4 mt-10 pt-6 border-t border-surface-800/80"
+              data-testid="kb-pagination"
+            >
+              <p className="text-sm text-surface-500">
+                {t('pagination.range', { start: rangeStart, end: rangeEnd, total: kbTotal })}
+              </p>
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-surface-500 flex items-center gap-2">
+                  {t('pagination.pageSize')}
+                  <select
+                    data-testid="kb-page-size"
+                    className="input-field py-1 px-2 text-sm w-auto"
+                    value={pageSize}
+                    onChange={(e) => {
+                      const size = Number(e.target.value);
+                      loadPage(0, size);
+                    }}
                   >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-sm text-surface-400 tabular-nums">
-                    {t('pagination.pageOf', { current: page + 1, total: totalPages })}
-                  </span>
-                  <button
-                    type="button"
-                    data-testid="kb-page-next"
-                    className="btn-ghost p-2 disabled:opacity-40"
-                    disabled={(page + 1) * pageSize >= kbTotal}
-                    onClick={() => loadPage(page + 1, pageSize)}
-                    aria-label={t('pagination.next')}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+                    {PAGE_SIZE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  data-testid="kb-page-prev"
+                  className="btn-ghost p-2 disabled:opacity-40"
+                  disabled={page === 0}
+                  onClick={() => loadPage(page - 1, pageSize)}
+                  aria-label={t('pagination.prev')}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-surface-400 tabular-nums min-w-[4.5rem] text-center">
+                  {t('pagination.pageOf', { current: page + 1, total: totalPages })}
+                </span>
+                <button
+                  type="button"
+                  data-testid="kb-page-next"
+                  className="btn-ghost p-2 disabled:opacity-40"
+                  disabled={(page + 1) * pageSize >= kbTotal}
+                  onClick={() => loadPage(page + 1, pageSize)}
+                  aria-label={t('pagination.next')}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+            </div>
+          )}
+        </>
+      )}
+      </TabPanel>
+    </AppShell>
   );
 }

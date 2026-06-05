@@ -70,6 +70,12 @@ function _mapKnownError(msg: string, isZh: boolean): string {
 
   // Common error patterns → user-friendly messages
   const patterns: Array<[RegExp, string, string]> = [
+    [/current password is incorrect/i,
+      '当前密码不正确，请重试。',
+      'Current password is incorrect. Please try again.'],
+    [/new password must be different/i,
+      '新密码不能与当前密码相同。',
+      'New password must be different from the current password.'],
     [/invalid.*(email|password|credentials)/i,
       '邮箱或密码错误，请检查后重试。',
       'Invalid email or password. Please check and try again.'],

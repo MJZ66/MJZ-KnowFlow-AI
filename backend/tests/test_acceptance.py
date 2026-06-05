@@ -40,6 +40,68 @@ def test_health(api_client: httpx.Client):
     assert r.json()["status"] == "ok"
 
 
+def _register_password_test_user(api_client: httpx.Client) -> dict:
+    user = unique_user()
+    reg = api_client.post("/api/auth/register", json=user)
+    assert reg.status_code == 201, reg.text
+    return {
+        "user": user,
+        "headers": auth_headers(reg.json()["access_token"]),
+    }
+
+
+def test_change_password(api_client: httpx.Client):
+    ctx = _register_password_test_user(api_client)
+    user = ctx["user"]
+    headers = ctx["headers"]
+    new_password = "NewPass456!"
+
+    r = api_client.post(
+        "/api/auth/change-password",
+        headers=headers,
+        json={"current_password": user["password"], "new_password": new_password},
+    )
+    assert r.status_code == 200, r.text
+    assert "updated" in r.json().get("message", "").lower()
+
+    login_new = api_client.post("/api/auth/login", json={
+        "email": user["email"],
+        "password": new_password,
+    })
+    assert login_new.status_code == 200
+
+    login_old = api_client.post("/api/auth/login", json={
+        "email": user["email"],
+        "password": user["password"],
+    })
+    assert login_old.status_code == 401
+
+
+def test_change_password_wrong_current(api_client: httpx.Client):
+    ctx = _register_password_test_user(api_client)
+    r = api_client.post(
+        "/api/auth/change-password",
+        headers=ctx["headers"],
+        json={"current_password": "wrong-password", "new_password": "AnotherPass1!"},
+    )
+    assert r.status_code == 401
+    body = r.json()
+    assert body.get("code") == "AUTH_WRONG_CURRENT_PASSWORD"
+
+
+def test_change_password_same_as_current(api_client: httpx.Client):
+    ctx = _register_password_test_user(api_client)
+    user = ctx["user"]
+    r = api_client.post(
+        "/api/auth/change-password",
+        headers=ctx["headers"],
+        json={"current_password": user["password"], "new_password": user["password"]},
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body.get("code") == "AUTH_PASSWORD_UNCHANGED"
+
+
 def test_unified_error_format(api_client: httpx.Client, auth_ctx):
     user = auth_ctx["user"]
     r = api_client.post("/api/auth/login", json={

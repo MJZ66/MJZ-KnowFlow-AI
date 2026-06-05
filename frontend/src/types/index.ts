@@ -18,14 +18,32 @@ export interface AuthTokens {
 // ============================================
 // Knowledge Base
 // ============================================
+export type PublishStatus = 'none' | 'pending' | 'approved' | 'rejected';
+
 export interface KnowledgeBase {
   id: number;
   user_id: number;
   name: string;
   description: string;
   visibility: 'private' | 'team' | 'public';
+  publish_status?: PublishStatus;
+  publish_requested_at?: string | null;
+  publish_reviewed_at?: string | null;
+  publish_review_note?: string | null;
+  owner_username?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface KBPublishRequest {
+  id: number;
+  user_id: number;
+  owner_username: string;
+  owner_email: string;
+  name: string;
+  description: string;
+  publish_requested_at: string | null;
+  created_at: string;
 }
 
 export interface KBMember {

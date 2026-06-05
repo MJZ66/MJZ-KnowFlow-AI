@@ -37,6 +37,16 @@ if [ "${RUN_MIGRATIONS_ON_START:-true}" = "true" ]; then
   alembic upgrade head
 fi
 
+if [ "${SEED_ADMIN_ON_START:-true}" = "true" ]; then
+  echo "Seeding default admin account (if configured)..."
+  python scripts/seed_admin.py || echo "Admin seed skipped or failed (non-fatal)."
+fi
+
+if [ "${PROMOTE_USER_ON_START:-false}" = "true" ]; then
+  echo "Promoting configured user account..."
+  python scripts/promote_account.py || echo "User promote skipped or failed (non-fatal)."
+fi
+
 if [ "$#" -gt 0 ]; then
   echo "Running custom command: $*"
   exec "$@"

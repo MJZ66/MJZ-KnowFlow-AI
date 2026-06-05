@@ -1,108 +1,159 @@
+#!/usr/bin/env python3
 """
-Cleanup script: remove FAILED test documents, their chunks, and ChromaDB vectors.
+Remove accumulated E2E/pytest users and related data.
+Keeps production accounts (MJZ, seed admin) and the legacy test super-admin (id=1).
 
-Usage (inside backend container):
-    python scripts/cleanup_test_data.py
-
-Or via docker:
-    docker compose exec backend python scripts/cleanup_test_data.py
-
-Safe: only deletes documents with status='failed'.
+Run:
+  python scripts/cleanup_test_data.py --dry-run
+  python scripts/cleanup_test_data.py
+  docker compose exec backend python scripts/cleanup_test_data.py
 """
 
+from __future__ import annotations
+
+import argparse
 import asyncio
-import logging
-import os
 import sys
+from pathlib import Path
 
-# Ensure backend package is importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select, update
+
 from app.core.database import async_session
-from app.models import Document, DocumentChunk, DocumentStatus
-from app.services.vector_service import VectorServiceFactory
+from app.core.security import hash_password
+from app.models import (
+    ChatMessage,
+    ChatSession,
+    Document,
+    DocumentChunk,
+    KnowledgeBase,
+    KnowledgeBaseMember,
+    OperationLog,
+    User,
+    UserRole,
+)
+from app.services.test_account import is_test_account, test_account_sql_clause
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
+KEEP_USER_IDS = {1, 2, 60}  # test super-admin, MJZ, seed admin
+KEEP_EMAILS = {"2429448372@qq.com", "admin@knowflow.local", "test2@example.com"}
+
+TEST_SUPER_ADMIN_EMAIL = "test2@example.com"
+TEST_SUPER_ADMIN_PASSWORD = "TestPass123!"
 
 
-async def cleanup_failed_documents():
-    """Delete all FAILED documents, their chunks, and ChromaDB vectors."""
-    async with async_session() as db:
-        # Find failed documents
-        result = await db.execute(
-            select(Document).where(Document.status == DocumentStatus.FAILED)
-        )
-        failed_docs = result.scalars().all()
+async def run(*, dry_run: bool) -> None:
+    async with async_session() as session:
+        result = await session.execute(select(User))
+        all_users = result.scalars().all()
 
-        if not failed_docs:
-            logger.info("No FAILED documents found. Nothing to clean up.")
+        to_delete: list[User] = []
+        for user in all_users:
+            if user.id in KEEP_USER_IDS:
+                continue
+            if user.email.lower() in KEEP_EMAILS:
+                continue
+            if is_test_account(email=user.email, username=user.username):
+                to_delete.append(user)
+
+        print(f"Users to delete: {len(to_delete)}")
+        for u in to_delete[:5]:
+            print(f"  - id={u.id} {u.username} <{u.email}>")
+        if len(to_delete) > 5:
+            print(f"  ... and {len(to_delete) - 5} more")
+
+        if dry_run:
+            print("Dry run — no changes applied.")
             return
 
-        logger.info(f"Found {len(failed_docs)} FAILED document(s):")
-
-        vector_service = VectorServiceFactory.get_service()
-
-        for doc in failed_docs:
-            logger.info(
-                f"  doc_id={doc.id}  file={doc.original_filename}  "
-                f"error={doc.error_message[:80] if doc.error_message else 'N/A'}"
+        delete_ids = [u.id for u in to_delete]
+        if delete_ids:
+            await session.execute(
+                update(KnowledgeBase)
+                .where(KnowledgeBase.publish_reviewed_by.in_(delete_ids))
+                .values(publish_reviewed_by=None)
+            )
+            await session.execute(
+                update(OperationLog)
+                .where(OperationLog.user_id.in_(delete_ids))
+                .values(user_id=None)
             )
 
-            # Delete vectors from ChromaDB
-            try:
-                await vector_service.delete_document_vectors(
-                    doc.knowledge_base_id, doc.id
+            kb_ids_result = await session.execute(
+                select(KnowledgeBase.id).where(KnowledgeBase.user_id.in_(delete_ids))
+            )
+            kb_ids = [row[0] for row in kb_ids_result.all()]
+
+            if kb_ids:
+                doc_ids_result = await session.execute(
+                    select(Document.id).where(Document.knowledge_base_id.in_(kb_ids))
                 )
-                logger.info(f"    → Deleted vectors from ChromaDB")
-            except Exception as e:
-                logger.warning(f"    → Failed to delete vectors: {e}")
+                doc_ids = [row[0] for row in doc_ids_result.all()]
+                if doc_ids:
+                    await session.execute(
+                        delete(DocumentChunk).where(DocumentChunk.document_id.in_(doc_ids))
+                    )
+                await session.execute(delete(Document).where(Document.knowledge_base_id.in_(kb_ids)))
+                await session.execute(
+                    delete(KnowledgeBaseMember).where(
+                        KnowledgeBaseMember.knowledge_base_id.in_(kb_ids)
+                    )
+                )
+                sess_ids = await session.execute(
+                    select(ChatSession.id).where(ChatSession.knowledge_base_id.in_(kb_ids))
+                )
+                session_ids = [row[0] for row in sess_ids.all()]
+                if session_ids:
+                    await session.execute(
+                        delete(ChatMessage).where(ChatMessage.session_id.in_(session_ids))
+                    )
+                await session.execute(
+                    delete(ChatSession).where(ChatSession.knowledge_base_id.in_(kb_ids))
+                )
+                await session.execute(delete(KnowledgeBase).where(KnowledgeBase.id.in_(kb_ids)))
 
-            # Delete chunks
-            chunk_result = await db.execute(
-                delete(DocumentChunk).where(DocumentChunk.document_id == doc.id)
-            )
-            logger.info(f"    → Deleted {chunk_result.rowcount} chunk(s) from DB")
+            await session.execute(delete(User).where(User.id.in_(delete_ids)))
+            print(f"Deleted {len(delete_ids)} test users and their knowledge bases.")
 
-            # Delete file on disk
-            if os.path.exists(doc.file_path):
-                os.remove(doc.file_path)
-                logger.info(f"    → Deleted file: {doc.file_path}")
-
-            # Delete document record
-            await db.delete(doc)
-            logger.info(f"    → Deleted document record")
-
-        await db.commit()
-        logger.info(f"\nCleanup complete: removed {len(failed_docs)} failed document(s).")
-
-
-async def show_status():
-    """Show current document status summary."""
-    async with async_session() as db:
-        from sqlalchemy import func
-
-        result = await db.execute(
-            select(Document.status, func.count(Document.id))
-            .group_by(Document.status)
+        # Promote MJZ to super_admin
+        mjz = await session.execute(
+            select(User).where(User.email == "2429448372@qq.com")
         )
-        logger.info("Current document status summary:")
-        for status, count in result.all():
-            st_val = status.value if hasattr(status, 'value') else str(status)
-            logger.info(f"  {st_val}: {count}")
+        mjz_user = mjz.scalar_one_or_none()
+        if mjz_user:
+            mjz_user.role = UserRole.SUPER_ADMIN
+            print(f"Promoted MJZ (id={mjz_user.id}) to super_admin.")
+
+        # Reset legacy test super-admin password (project E2E standard)
+        test_user = await session.execute(
+            select(User).where(User.email == TEST_SUPER_ADMIN_EMAIL)
+        )
+        test = test_user.scalar_one_or_none()
+        if test:
+            test.role = UserRole.SUPER_ADMIN
+            test.hashed_password = hash_password(TEST_SUPER_ADMIN_PASSWORD)
+            print(
+                f"Reset test super-admin password: email={TEST_SUPER_ADMIN_EMAIL} "
+                f"username={test.username}"
+            )
+
+        await session.commit()
+
+        remaining = await session.execute(
+            select(User).where(~test_account_sql_clause())
+        )
+        real_users = remaining.scalars().all()
+        print(f"Remaining non-test users: {len(real_users)}")
+        for u in real_users:
+            print(f"  id={u.id} {u.username} <{u.email}> role={u.role.value}")
 
 
-async def main():
-    logger.info("=" * 60)
-    logger.info("KnowFlow AI — Test Data Cleanup")
-    logger.info("=" * 60)
-    await show_status()
-    print()
-    await cleanup_failed_documents()
-    print()
-    await show_status()
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    asyncio.run(run(dry_run=args.dry_run))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

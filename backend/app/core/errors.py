@@ -16,6 +16,8 @@ class ErrorCode(str, Enum):
     AUTH_INVALID_TOKEN = "AUTH_INVALID_TOKEN"
     AUTH_EMAIL_EXISTS = "AUTH_EMAIL_EXISTS"
     AUTH_INVALID_CREDENTIALS = "AUTH_INVALID_CREDENTIALS"
+    AUTH_WRONG_CURRENT_PASSWORD = "AUTH_WRONG_CURRENT_PASSWORD"
+    AUTH_PASSWORD_UNCHANGED = "AUTH_PASSWORD_UNCHANGED"
 
     # Permission
     PERMISSION_DENIED = "PERMISSION_DENIED"
@@ -58,6 +60,8 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.AUTH_INVALID_TOKEN: "登录凭证无效",
     ErrorCode.AUTH_EMAIL_EXISTS: "该邮箱已注册",
     ErrorCode.AUTH_INVALID_CREDENTIALS: "邮箱或密码错误",
+    ErrorCode.AUTH_WRONG_CURRENT_PASSWORD: "当前密码不正确",
+    ErrorCode.AUTH_PASSWORD_UNCHANGED: "新密码不能与当前密码相同",
     ErrorCode.PERMISSION_DENIED: "无权限访问",
     ErrorCode.ADMIN_REQUIRED: "需要管理员权限",
     ErrorCode.KB_NOT_FOUND: "知识库不存在",
@@ -86,6 +90,8 @@ ERROR_MESSAGES_EN: dict[ErrorCode, str] = {
     ErrorCode.AUTH_INVALID_TOKEN: "Invalid token",
     ErrorCode.AUTH_EMAIL_EXISTS: "Email already registered",
     ErrorCode.AUTH_INVALID_CREDENTIALS: "Invalid email or password",
+    ErrorCode.AUTH_WRONG_CURRENT_PASSWORD: "Current password is incorrect",
+    ErrorCode.AUTH_PASSWORD_UNCHANGED: "New password must differ from the current password",
     ErrorCode.PERMISSION_DENIED: "Permission denied",
     ErrorCode.ADMIN_REQUIRED: "Admin privileges required",
     ErrorCode.KB_NOT_FOUND: "Knowledge base not found",
@@ -135,6 +141,12 @@ def error_response(code: ErrorCode, detail: Optional[str] = None) -> dict:
 _DETAIL_TO_CODE: dict[str, ErrorCode] = {
     "Email already registered.": ErrorCode.AUTH_EMAIL_EXISTS,
     "Invalid email or password.": ErrorCode.AUTH_INVALID_CREDENTIALS,
+    "Current password is incorrect.": ErrorCode.AUTH_WRONG_CURRENT_PASSWORD,
+    "New password must be different from the current password.": ErrorCode.AUTH_PASSWORD_UNCHANGED,
+    "Use publish request to share to the public catalog. Admin approval required.": ErrorCode.PERMISSION_DENIED,
+    "Publish request is already pending.": ErrorCode.VALIDATION_ERROR,
+    "Knowledge base is already public.": ErrorCode.VALIDATION_ERROR,
+    "Only the owner can request publishing.": ErrorCode.PERMISSION_DENIED,
     "Invalid token type.": ErrorCode.AUTH_INVALID_TOKEN,
     "Invalid or expired token.": ErrorCode.AUTH_INVALID_TOKEN,
     "Invalid or expired refresh token.": ErrorCode.AUTH_INVALID_TOKEN,

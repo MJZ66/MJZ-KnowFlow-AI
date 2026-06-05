@@ -11,12 +11,12 @@ const statusKey: Record<DocumentStatus, string> = {
 };
 
 const statusClass: Record<DocumentStatus, string> = {
-  uploaded: 'bg-surface-700 text-surface-300',
-  parsing: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  chunking: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  embedding: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  completed: 'bg-green-500/10 text-green-400 border-green-500/30',
-  failed: 'bg-red-500/10 text-red-400 border-red-500/30',
+  uploaded: 'bg-surface-800 text-surface-400 border-surface-700',
+  parsing: 'bg-brand-500/10 text-brand-400 border-brand-500/25',
+  chunking: 'bg-brand-500/10 text-brand-400 border-brand-500/25',
+  embedding: 'bg-brand-500/10 text-brand-400 border-brand-500/25',
+  completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25',
+  failed: 'bg-red-500/10 text-red-400 border-red-500/25',
 };
 
 export default function DocumentStatusBadge({ status }: { status: DocumentStatus }) {

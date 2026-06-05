@@ -4,6 +4,7 @@ Authentication API routes:
 - POST /api/auth/login
 - POST /api/auth/refresh
 - GET  /api/auth/me
+- POST /api/auth/change-password
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,8 +22,11 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User, UserRole
+from app.services.user_activity import record_login
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
+    MessageResponse,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
@@ -56,6 +60,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     )
     db.add(user)
     await db.flush()
+    record_login(user)
 
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
@@ -77,6 +82,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid email or password.",
         )
 
+    record_login(user)
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
 
@@ -121,3 +127,27 @@ async def get_me(current_user: User = Depends(get_current_user)):
         role=current_user.role.value if hasattr(current_user.role, 'value') else current_user.role,
         created_at=current_user.created_at.isoformat(),
     )
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change password for the authenticated user."""
+    if not verify_password(req.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+        )
+    if req.current_password == req.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password.",
+        )
+
+    current_user.hashed_password = hash_password(req.new_password)
+    await db.flush()
+
+    return MessageResponse(message="Password updated successfully.")

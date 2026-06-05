@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
-from app.models import User
+from app.models import User, UserRole
+from app.services.user_activity import touch_activity
 
 security_scheme = HTTPBearer()
 
@@ -51,6 +52,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found.",
         )
+    touch_activity(user)
     return user
 
 
@@ -65,7 +67,7 @@ async def get_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """Require admin or super_admin role."""
-    if current_user.role not in ("admin", "super_admin"):
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required.",
@@ -77,7 +79,7 @@ async def get_super_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """Require super_admin role."""
-    if current_user.role != "super_admin":
+    if current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super admin privileges required.",

@@ -3,9 +3,20 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --kf-accent: #14b8a6;
+    --kf-glow: rgba(20, 184, 166, 0.14);
+    --kf-scroll: #cdd8e0;
+  }
+
+  .dark {
+    --kf-glow: rgba(45, 212, 191, 0.15);
+    --kf-scroll: #2d3a44;
+  }
+
   * {
     scrollbar-width: thin;
-    scrollbar-color: #334155 transparent;
+    scrollbar-color: var(--kf-scroll) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -15,45 +26,228 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background-color: #334155;
+    background-color: var(--kf-scroll);
     border-radius: 3px;
   }
 
   body {
-    @apply bg-surface-950 text-surface-100;
+    @apply bg-surface-50 text-surface-900 dark:bg-surface-950 dark:text-surface-100 font-sans;
+  }
+
+  ::selection {
+    background: rgba(20, 184, 166, 0.28);
+    color: inherit;
   }
 }
 
 @layer components {
+  .page-bg {
+    @apply relative min-h-screen bg-surface-50 dark:bg-surface-950;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, var(--kf-glow), transparent),
+      radial-gradient(ellipse 40% 30% at 100% 0%, rgba(20, 184, 166, 0.06), transparent),
+      radial-gradient(ellipse 35% 25% at 0% 100%, rgba(148, 163, 175, 0.12), transparent);
+  }
+
+  .dark .page-bg {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, var(--kf-glow), transparent),
+      radial-gradient(ellipse 40% 30% at 100% 0%, rgba(15, 118, 110, 0.08), transparent),
+      radial-gradient(ellipse 35% 25% at 0% 100%, rgba(45, 58, 68, 0.2), transparent);
+  }
+
+  .page-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 0;
+  }
+
+  .dark .page-bg::before {
+    opacity: 0.04;
+  }
+
+  .page-bg > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-500 text-white font-medium px-4 py-2 rounded-lg
+    @apply bg-brand-600 hover:bg-brand-500 text-white font-semibold px-4 py-2 rounded-lg
            transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
-           focus:outline-none focus:ring-2 focus:ring-brand-500/50;
+           focus:outline-none focus:ring-2 focus:ring-brand-500/40 shadow-sm hover:shadow-glow;
   }
   .btn-secondary {
-    @apply bg-surface-800 hover:bg-surface-700 text-surface-200 font-medium px-4 py-2 rounded-lg
-           border border-surface-700 transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-surface-500/50;
+    @apply bg-surface-100 hover:bg-surface-200 text-surface-800 font-medium px-4 py-2 rounded-lg
+           border border-surface-300 transition-all duration-200
+           dark:bg-surface-800/80 dark:hover:bg-surface-700 dark:text-surface-200 dark:border-surface-700
+           focus:outline-none focus:ring-2 focus:ring-surface-400/40 dark:focus:ring-surface-500/40;
   }
   .btn-ghost {
-    @apply hover:bg-surface-800/50 text-surface-300 font-medium px-3 py-2 rounded-lg
-           transition-all duration-200;
+    @apply hover:bg-surface-200/80 text-surface-600 font-medium px-3 py-2 rounded-lg
+           transition-all duration-200
+           dark:hover:bg-surface-800/60 dark:text-surface-300;
   }
   .btn-danger {
-    @apply bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium px-4 py-2 rounded-lg
-           border border-red-600/30 transition-all duration-200;
+    @apply bg-red-600/10 hover:bg-red-600/20 text-red-600 font-medium px-4 py-2 rounded-lg
+           border border-red-500/25 transition-all duration-200
+           dark:bg-red-600/15 dark:hover:bg-red-600/25 dark:text-red-400 dark:border-red-600/25;
   }
   .input-field {
-    @apply w-full bg-surface-900 border border-surface-700 rounded-lg px-4 py-2.5
-           text-surface-100 placeholder:text-surface-500
-           focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500
-           transition-all duration-200;
+    @apply w-full bg-white border border-surface-300 rounded-lg px-4 py-2.5
+           text-surface-900 placeholder:text-surface-400
+           focus:outline-none focus:ring-2 focus:ring-brand-500/35 focus:border-brand-600/60
+           transition-all duration-200
+           dark:bg-surface-900/90 dark:border-surface-700 dark:text-surface-100 dark:placeholder:text-surface-500;
   }
   .card {
-    @apply bg-surface-900 border border-surface-800 rounded-xl p-6
-           hover:border-surface-700 transition-all duration-200;
+    @apply bg-white border border-surface-200 rounded-xl p-6 shadow-card
+           hover:border-surface-300 transition-all duration-300
+           dark:bg-surface-900/90 dark:border-surface-800 dark:hover:border-surface-600/80;
+  }
+  .card-interactive {
+    @apply card hover:-translate-y-0.5 hover:shadow-glow hover:border-brand-500/30
+           dark:hover:border-brand-600/25;
   }
   .glass-panel {
-    @apply bg-surface-900/80 backdrop-blur-xl border border-surface-800/50 rounded-xl;
+    @apply bg-white/85 backdrop-blur-xl border border-surface-200/90 rounded-xl
+           dark:bg-surface-950/75 dark:border-surface-800/80;
+  }
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-surface-500 flex items-center gap-2;
+  }
+  .section-label::before {
+    content: '';
+    @apply w-1 h-3.5 rounded-full bg-brand-500 shrink-0;
+  }
+  .pane-header {
+    @apply text-sm font-semibold text-surface-700 flex items-center gap-2 dark:text-surface-300;
+  }
+  .doc-row {
+    @apply bg-white border border-surface-200 rounded-lg p-3
+           hover:border-brand-500/30 hover:bg-surface-50 transition-all duration-200
+           dark:bg-surface-900/80 dark:border-surface-800 dark:hover:border-brand-600/20 dark:hover:bg-surface-900;
+  }
+  .chat-bubble-user {
+    @apply rounded-2xl rounded-tr-md bg-surface-100 border border-surface-300 px-4 py-2.5
+           dark:bg-surface-800/90 dark:border-surface-700/80;
+  }
+  .chat-bubble-assistant {
+    @apply rounded-2xl rounded-tl-md bg-white border border-surface-200 px-4 py-2.5
+           dark:bg-surface-900/90 dark:border-surface-800;
+  }
+  .admin-tabs {
+    @apply flex gap-1 p-1 w-fit rounded-xl bg-surface-100 border border-surface-200
+           dark:bg-surface-900 dark:border-surface-800;
+  }
+  .admin-tab {
+    @apply flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+           text-surface-500 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200;
+  }
+  .admin-tab-active {
+    @apply admin-tab bg-white text-surface-900 shadow-sm border border-surface-200
+           dark:bg-surface-700 dark:text-surface-100 dark:border-surface-600;
+  }
+  .admin-stat-card {
+    @apply card text-center !p-5 hover:border-brand-500/25;
+  }
+  .admin-table-wrap {
+    @apply card overflow-hidden !p-0 border-surface-200 dark:border-surface-800;
+  }
+  .admin-table th {
+    @apply text-left py-3 px-4 text-surface-500 font-medium text-xs uppercase tracking-wide
+           bg-surface-50 dark:bg-surface-900/80 dark:text-surface-400;
+  }
+  .admin-table td {
+    @apply py-3 px-4 text-surface-700 dark:text-surface-300;
+  }
+  .admin-table tbody tr {
+    @apply border-b border-surface-100 hover:bg-surface-50/80 transition-colors
+           dark:border-surface-800/50 dark:hover:bg-surface-800/30;
+  }
+  .admin-hero {
+    @apply shadow-card;
+  }
+  .admin-activity-bar {
+    @apply bg-gradient-to-t from-brand-700/70 to-brand-400/90 min-h-[4px];
+  }
+  .admin-activity-bar-today {
+    @apply from-brand-600 to-brand-300 shadow-glow;
+  }
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.12s; }
+  .stagger-3 { animation-delay: 0.2s; }
+
+  .route-view {
+    animation: routeEnter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .tab-panel {
+    animation: tabCrossfade 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .modal-backdrop {
+    animation: backdropIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .modal-panel {
+    animation: modalIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes routeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tabCrossfade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-view,
+  .tab-panel,
+  .modal-backdrop,
+  .modal-panel,
+  .animate-fade-in,
+  .animate-fade-up {
+    animation: none !important;
   }
 }
