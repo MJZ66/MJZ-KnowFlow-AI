@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { Loader2, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import type { ChatSession } from '../types';
 
 interface Props {
@@ -8,9 +8,19 @@ interface Props {
   onSelect: (session: ChatSession) => void;
   onCreate: () => void;
   onDelete: (session: ChatSession) => void;
+  creating?: boolean;
+  deletingId?: number | null;
 }
 
-export default function SessionList({ sessions, currentSessionId, onSelect, onCreate, onDelete }: Props) {
+export default function SessionList({
+  sessions,
+  currentSessionId,
+  onSelect,
+  onCreate,
+  onDelete,
+  creating = false,
+  deletingId = null,
+}: Props) {
   const { t } = useTranslation();
 
   return (
@@ -20,11 +30,15 @@ export default function SessionList({ sessions, currentSessionId, onSelect, onCr
         <button
           type="button"
           data-testid="chat-new-session"
-          onClick={onCreate}
-          className="btn-ghost p-1.5"
+          onClick={() => void onCreate()}
+          disabled={creating}
+          aria-busy={creating}
+          className={`btn-ghost p-1.5 transition-all duration-200 ${
+            creating ? 'opacity-70 cursor-wait' : 'active:scale-90'
+          }`}
           title={t('chat.newSession')}
         >
-          <Plus className="w-4 h-4" />
+          {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -41,10 +55,23 @@ export default function SessionList({ sessions, currentSessionId, onSelect, onCr
               <MessageSquare className="w-4 h-4 shrink-0 text-surface-500" />
               <span className="text-sm text-surface-300 truncate">{s.title}</span>
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(s); }}
-              className="p-1.5 text-surface-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-              title={t('common.delete')}>
-              <Trash2 className="w-3.5 h-3.5" />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void onDelete(s);
+              }}
+              disabled={deletingId === s.id}
+              className={`p-1.5 text-surface-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all ${
+                deletingId === s.id ? 'opacity-100 cursor-wait' : ''
+              }`}
+              title={t('common.delete')}
+            >
+              {deletingId === s.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         ))}

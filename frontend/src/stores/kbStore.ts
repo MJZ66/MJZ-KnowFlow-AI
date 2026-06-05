@@ -46,6 +46,7 @@ interface KBState {
   addMember: (kbId: number, userId: number, role: string) => Promise<void>;
   removeMember: (kbId: number, userId: number) => Promise<void>;
   setCurrentKB: (kb: KnowledgeBase | null) => void;
+  reset: () => void;
 }
 
 export const useKBStore = create<KBState>((set, get) => ({
@@ -151,4 +152,16 @@ export const useKBStore = create<KBState>((set, get) => ({
   },
 
   setCurrentKB: (kb) => set({ currentKB: kb }),
+
+  reset: () =>
+    set({
+      kbs: [],
+      kbTotal: 0,
+      kbSkip: 0,
+      publicKbs: [],
+      publicKbTotal: 0,
+      currentKB: null,
+      members: [],
+      isLoading: false,
+    }),
 }));

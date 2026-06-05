@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, BookOpen, Settings, LogOut, ChevronLeft, ChevronRight, User, Lock, Globe } from 'lucide-react';
+import { Plus, BookOpen, ChevronLeft, ChevronRight, Lock, Globe, Loader2 } from 'lucide-react';
 import { useUserStore } from '../stores/userStore';
+import UserNavActions from '../components/UserNavActions';
 import { useKBStore } from '../stores/kbStore';
 import KnowledgeBaseCard from '../components/KnowledgeBaseCard';
 import AppShell from '../components/AppShell';
@@ -13,12 +14,12 @@ const PAGE_SIZE_OPTIONS = [6, 12, 24];
 export default function DashboardPage() {
   const { t } = useTranslation();
   const user = useUserStore((s) => s.user);
-  const logout = useUserStore((s) => s.logout);
   const { kbs, kbTotal, isLoading, fetchKBs, fetchPublicKBs, publicKbs, publicKbTotal, createKB } = useKBStore();
   const navigate = useNavigate();
   const [listTab, setListTab] = useState<'mine' | 'public'>('mine');
   const [publicLoading, setPublicLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [page, setPage] = useState(0);
@@ -46,12 +47,17 @@ export default function DashboardPage() {
   }, [listTab, fetchPublicKBs]);
 
   const handleCreate = async () => {
-    if (!newName.trim()) return;
-    const kb = await createKB(newName.trim(), newDesc.trim(), 'private');
-    setShowCreate(false);
-    setNewName('');
-    setNewDesc('');
-    navigate(`/kbs/${kb.id}`);
+    if (!newName.trim() || creating) return;
+    setCreating(true);
+    try {
+      const kb = await createKB(newName.trim(), newDesc.trim(), 'private');
+      setShowCreate(false);
+      setNewName('');
+      setNewDesc('');
+      navigate(`/kbs/${kb.id}`);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const rangeStart = kbTotal === 0 ? 0 : page * pageSize + 1;
@@ -60,27 +66,7 @@ export default function DashboardPage() {
   return (
     <AppShell
       userLabel={user?.username}
-      actions={
-        <>
-          <button
-            type="button"
-            data-testid="nav-account"
-            onClick={() => navigate('/account')}
-            className="btn-ghost p-2"
-            title={t('account.title')}
-          >
-            <User className="w-4 h-4" />
-          </button>
-          {user?.role !== 'user' && (
-            <button onClick={() => navigate('/admin')} className="btn-ghost p-2" title={t('admin.title')}>
-              <Settings className="w-4 h-4" />
-            </button>
-          )}
-          <button onClick={logout} className="btn-ghost p-2 text-red-400/90 hover:text-red-400" title={t('auth.logout')}>
-            <LogOut className="w-4 h-4" />
-          </button>
-        </>
-      }
+      actions={<UserNavActions />}
     >
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 animate-fade-up">
         <div>
@@ -159,10 +145,13 @@ export default function DashboardPage() {
               <button
                 type="button"
                 data-testid="kb-create-submit"
-                onClick={handleCreate}
-                className="btn-primary"
-                disabled={!newName.trim()}
+                onClick={() => void handleCreate()}
+                className={`btn-primary inline-flex items-center gap-2 transition-all ${
+                  creating ? 'opacity-80 cursor-wait' : 'active:scale-[0.98]'
+                }`}
+                disabled={!newName.trim() || creating}
               >
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                 {t('common.confirm')}
               </button>
             </div>

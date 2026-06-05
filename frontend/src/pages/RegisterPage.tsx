@@ -6,6 +6,7 @@ import { useUserStore } from '../stores/userStore';
 import { parseApiError } from '../utils/error';
 import AuthLayout from '../components/AuthLayout';
 import PasswordRequirements from '../components/PasswordRequirements';
+import SubmitButton from '../components/SubmitButton';
 import { isPasswordValid } from '../utils/password';
 
 export default function RegisterPage() {
@@ -102,9 +103,12 @@ export default function RegisterPage() {
           </div>
           <PasswordRequirements password={password} className="mt-2" />
         </div>
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3 mt-2">
-          {loading ? t('auth.registering') : t('auth.registerButton')}
-        </button>
+        <SubmitButton
+          loading={loading}
+          loadingLabel={t('auth.registering')}
+          label={t('auth.registerButton')}
+          className="btn-primary w-full py-3 mt-2"
+        />
       </form>
     </AuthLayout>
   );

@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  BookOpen, ArrowLeft, User, Bot, PanelRightClose, PanelRightOpen,
+  BookOpen, User, Bot, PanelRightClose, PanelRightOpen, Loader2,
 } from 'lucide-react';
+import AppPageHeader from '../components/AppPageHeader';
 import { useKBStore } from '../stores/kbStore';
 import { useChatStore } from '../stores/chatStore';
 import SessionList from '../components/SessionList';
 import ChatInput from '../components/ChatInput';
 import ReferencePanel from '../components/ReferencePanel';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import ThemeSwitcher from '../components/ThemeSwitcher';
 import { parseApiError } from '../utils/error';
 import type { ChatSession, ChatMessage } from '../types';
 
@@ -21,6 +21,8 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showRefs, setShowRefs] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const { currentKB, fetchKB } = useKBStore();
   const {
     sessions, currentSession,
@@ -42,8 +44,13 @@ export default function ChatPage() {
   }, [messages, streamContent]);
 
   const handleCreateSession = async () => {
-    if (!kbIdNum) return;
-    await createSession(kbIdNum);
+    if (!kbIdNum || creatingSession) return;
+    setCreatingSession(true);
+    try {
+      await createSession(kbIdNum);
+    } finally {
+      setCreatingSession(false);
+    }
   };
 
   const handleSelectSession = (session: ChatSession) => {
@@ -51,7 +58,13 @@ export default function ChatPage() {
   };
 
   const handleDeleteSession = async (session: ChatSession) => {
-    await deleteSession(session.id);
+    if (deletingSessionId !== null) return;
+    setDeletingSessionId(session.id);
+    try {
+      await deleteSession(session.id);
+    } finally {
+      setDeletingSessionId(null);
+    }
   };
 
   const handleSendMessage = async (content: string) => {
@@ -70,20 +83,22 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col page-bg overflow-hidden">
-      <header className="h-14 border-b border-surface-200 dark:border-surface-800 flex items-center px-4 gap-4 shrink-0 glass-panel rounded-none">
-        <button onClick={() => navigate(`/kbs/${kbIdNum}`)} className="btn-ghost p-1.5" title={t('common.back')}>
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="flex items-center gap-2 min-w-0">
-          <BookOpen className="w-4 h-4 text-brand-400 shrink-0" />
-          <h2 className="font-semibold text-surface-200 truncate">{currentKB?.name || t('common.loading')}</h2>
-        </div>
-        <div className="flex-1" />
-        <ThemeSwitcher />
-        <button onClick={() => setShowRefs(!showRefs)} className="btn-ghost p-1.5" title={showRefs ? t('chat.hideRefs') : t('chat.showRefs')}>
-          {showRefs ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-        </button>
-      </header>
+      <AppPageHeader
+        title={currentKB?.name || t('common.loading')}
+        subtitle={t('chat.startChat')}
+        icon={<BookOpen className="w-4 h-4 text-brand-600 dark:text-brand-400" />}
+        onBack={() => navigate(`/kbs/${kbIdNum}`)}
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowRefs(!showRefs)}
+            className="btn-ghost p-1.5 active:scale-90 transition-all duration-200"
+            title={showRefs ? t('chat.hideRefs') : t('chat.showRefs')}
+          >
+            {showRefs ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+          </button>
+        }
+      />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar */}
@@ -94,6 +109,8 @@ export default function ChatPage() {
             onSelect={handleSelectSession}
             onCreate={handleCreateSession}
             onDelete={handleDeleteSession}
+            creating={creatingSession}
+            deletingId={deletingSessionId}
           />
         </div>
 
@@ -105,7 +122,17 @@ export default function ChatPage() {
                 <Bot className="w-16 h-16 text-surface-700 mb-4" />
                 <h3 className="text-xl font-semibold text-surface-300 mb-2">{t('chat.startChat')}</h3>
                 <p className="text-surface-500 text-sm mb-4">{t('chat.startHint')}</p>
-                <button onClick={handleCreateSession} className="btn-primary">{t('chat.newSession')}</button>
+                <button
+                  type="button"
+                  onClick={() => void handleCreateSession()}
+                  disabled={creatingSession}
+                  className={`btn-primary inline-flex items-center gap-2 transition-all ${
+                    creatingSession ? 'opacity-80 cursor-wait' : 'active:scale-[0.98]'
+                  }`}
+                >
+                  {creatingSession && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {t('chat.newSession')}
+                </button>
               </div>
             ) : displayMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Lock, Mail, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 import AppShell from '../components/AppShell';
+import UserNavActions from '../components/UserNavActions';
+import SubmitButton from '../components/SubmitButton';
 import { useUserStore } from '../stores/userStore';
 import { parseApiError } from '../utils/error';
 
@@ -55,13 +57,16 @@ export default function AccountPage() {
     <AppShell
       userLabel={user?.username}
       actions={
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="btn-secondary text-sm"
-        >
-          {t('common.back')}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="btn-secondary text-sm"
+          >
+            {t('common.back')}
+          </button>
+          <UserNavActions />
+        </>
       }
     >
       <div className="max-w-lg mx-auto">
@@ -145,14 +150,13 @@ export default function AccountPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            data-testid="account-change-password-submit"
-            disabled={loading}
+          <SubmitButton
+            testId="account-change-password-submit"
+            loading={loading}
+            loadingLabel={t('account.saving')}
+            label={t('account.savePassword')}
             className="btn-primary w-full py-3"
-          >
-            {loading ? t('account.saving') : t('account.savePassword')}
-          </button>
+          />
         </form>
       </div>
     </AppShell>

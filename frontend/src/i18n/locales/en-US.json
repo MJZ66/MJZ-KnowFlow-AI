@@ -28,6 +28,7 @@
   "auth.noAccount": "Don't have an account?",
   "auth.hasAccount": "Already have an account?",
   "auth.logout": "Sign Out",
+  "auth.loggingOut": "Signing out…",
   "auth.tokenExpired": "Session expired, please sign in again",
   "auth.unauthorized": "Not authenticated or session expired",
   "auth.invalidCredentials": "Invalid email or password. Please check and try again.",

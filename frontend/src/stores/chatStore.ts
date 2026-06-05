@@ -24,6 +24,7 @@ interface ChatState {
   sendMessage: (sessionId: number, content: string, topK?: number) => Promise<void>;
   stopStreaming: () => void;
   clearStreamState: () => void;
+  reset: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -222,6 +223,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       retrievalStatus: '',
       retrievalStats: null,
       isStreaming: false,
+    });
+  },
+
+  reset: () => {
+    const { abortController } = get();
+    if (abortController) abortController.abort();
+    set({
+      sessions: [],
+      currentSession: null,
+      messages: [],
+      isStreaming: false,
+      streamContent: '',
+      references: [],
+      streamError: null,
+      retrievalStatus: '',
+      retrievalStats: null,
+      abortController: null,
     });
   },
 }));

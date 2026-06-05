@@ -1,23 +1,29 @@
 import { create } from 'zustand';
 import type { User, AuthTokens } from '../types';
 import { api, setTokens, clearTokens } from '../api/client';
+import { useKBStore } from './kbStore';
+import { useChatStore } from './chatStore';
+
+const LOGOUT_ANIMATION_MS = 380;
 
 interface UserState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLoggingOut: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, username: string) => Promise<void>;
   fetchMe: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>((set) => ({
   user: null,
   isAuthenticated: !!localStorage.getItem('access_token'),
   isLoading: false,
+  isLoggingOut: false,
 
   login: async (email, password) => {
     const tokens = await api<AuthTokens>('/api/auth/login', {
@@ -66,8 +72,14 @@ export const useUserStore = create<UserState>((set) => ({
     });
   },
 
-  logout: () => {
+  logout: async () => {
+    const { isLoggingOut } = useUserStore.getState();
+    if (isLoggingOut) return;
+    set({ isLoggingOut: true });
+    await new Promise((resolve) => setTimeout(resolve, LOGOUT_ANIMATION_MS));
     clearTokens();
-    set({ user: null, isAuthenticated: false });
+    useChatStore.getState().reset();
+    useKBStore.getState().reset();
+    set({ user: null, isAuthenticated: false, isLoggingOut: false });
   },
 }));

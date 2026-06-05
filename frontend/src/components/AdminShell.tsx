@@ -3,6 +3,7 @@ import { Shield, ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LangSwitcher from './LangSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
+import UserNavActions from './UserNavActions';
 
 interface AdminShellProps {
   children: ReactNode;
@@ -33,6 +34,7 @@ export default function AdminShell({ children, onBack }: AdminShellProps) {
           <div className="flex items-center gap-2 shrink-0">
             <ThemeSwitcher testId="admin-theme-switcher" />
             <LangSwitcher testId="admin-lang-switcher" />
+            <UserNavActions />
           </div>
         </div>
       </header>

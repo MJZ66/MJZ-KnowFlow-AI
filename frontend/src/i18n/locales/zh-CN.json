@@ -28,6 +28,7 @@
   "auth.noAccount": "还没有账号？",
   "auth.hasAccount": "已有账号？",
   "auth.logout": "退出登录",
+  "auth.loggingOut": "正在退出…",
   "auth.tokenExpired": "登录已过期，请重新登录",
   "auth.unauthorized": "未登录或登录已过期",
   "auth.invalidCredentials": "邮箱或密码错误，请检查后重试。",

@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeft, Trash2, MessageSquare, FileText, BookOpen,
-  User, Bot, PanelRightClose, PanelRightOpen,
+  Trash2, MessageSquare, FileText, BookOpen,
+  User, Bot, PanelRightClose, PanelRightOpen, Loader2,
 } from 'lucide-react';
+import AppPageHeader from '../components/AppPageHeader';
+import IconActionButton from '../components/IconActionButton';
 import { useKBStore } from '../stores/kbStore';
 import { useChatStore } from '../stores/chatStore';
 import FileUploader from '../components/FileUploader';
@@ -14,8 +16,6 @@ import ChatInput from '../components/ChatInput';
 import ReferencePanel from '../components/ReferencePanel';
 import DocumentPreviewPanel from '../components/DocumentPreviewPanel';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import LangSwitcher from '../components/LangSwitcher';
-import ThemeSwitcher from '../components/ThemeSwitcher';
 import KBPublishPanel from '../components/KBPublishPanel';
 import { api } from '../api/client';
 import { parseApiError } from '../utils/error';
@@ -46,6 +46,12 @@ export default function KBDetailPage() {
     setPreviewChunkIndex(ref.chunk_index ?? null);
     setPreviewOpen(true);
   };
+
+  const [deletingKb, setDeletingKb] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [navigatingBack, setNavigatingBack] = useState(false);
 
   const [docPage, setDocPage] = useState(0);
   const DOC_PAGE_SIZE = 20;
@@ -113,23 +119,42 @@ export default function KBDetailPage() {
   };
 
   const handleDeleteDoc = async (docId: number) => {
-    if (!confirm(t('document.confirmDelete'))) return;
+    if (!confirm(t('document.confirmDelete')) || deletingDocId !== null) return;
+    setDeletingDocId(docId);
     try {
       await api(`/api/kbs/${kbIdNum}/documents/${docId}`, { method: 'DELETE' });
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
     } catch { /* ignore */ }
+    finally { setDeletingDocId(null); }
   };
 
   const handleDeleteKB = async () => {
-    if (!confirm(t('kb.confirmDelete'))) return;
-    await deleteKB(kbIdNum);
+    if (!confirm(t('kb.confirmDelete')) || deletingKb) return;
+    setDeletingKb(true);
+    try {
+      await deleteKB(kbIdNum);
+      navigate('/dashboard', { replace: true });
+    } finally {
+      setDeletingKb(false);
+    }
+  };
+
+  const handleBack = async () => {
+    if (navigatingBack) return;
+    setNavigatingBack(true);
+    await new Promise((r) => setTimeout(r, 120));
     navigate('/dashboard');
   };
 
   // Chat actions
   const handleCreateSession = async () => {
-    if (!kbIdNum) return;
-    await createSession(kbIdNum);
+    if (!kbIdNum || creatingSession) return;
+    setCreatingSession(true);
+    try {
+      await createSession(kbIdNum);
+    } finally {
+      setCreatingSession(false);
+    }
   };
 
   const handleSelectSession = (session: ChatSession) => {
@@ -137,7 +162,13 @@ export default function KBDetailPage() {
   };
 
   const handleDeleteSession = async (session: ChatSession) => {
-    await deleteSession(session.id);
+    if (deletingSessionId !== null) return;
+    setDeletingSessionId(session.id);
+    try {
+      await deleteSession(session.id);
+    } finally {
+      setDeletingSessionId(null);
+    }
   };
 
   const handleSendMessage = async (content: string) => {
@@ -163,22 +194,25 @@ export default function KBDetailPage() {
 
   return (
     <div className="h-screen flex flex-col page-bg overflow-hidden">
-      <header className="h-14 border-b border-surface-800/90 flex items-center px-4 gap-3 shrink-0 glass-panel rounded-none">
-        <button onClick={() => navigate('/dashboard')} className="btn-ghost p-1.5" title={t('common.back')}>
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="w-8 h-8 rounded-lg bg-brand-500/15 border border-brand-500/25 flex items-center justify-center shrink-0">
-          <BookOpen className="w-4 h-4 text-brand-400" />
-        </div>
-        <h1 className="font-display font-semibold text-surface-900 dark:text-surface-100 truncate flex-1 text-base sm:text-lg">
-          {currentKB?.name || t('common.loading')}
-        </h1>
-        <ThemeSwitcher testId="kb-detail-theme-switcher" />
-        <LangSwitcher testId="kb-detail-lang-switcher" />
-        <button onClick={handleDeleteKB} className="btn-ghost p-2 text-red-400/90 hover:text-red-400" title={t('common.delete')}>
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </header>
+      <AppPageHeader
+        title={currentKB?.name || t('common.loading')}
+        subtitle={currentKB?.description || undefined}
+        icon={<BookOpen className="w-4 h-4 text-brand-600 dark:text-brand-400" />}
+        onBack={() => void handleBack()}
+        backPending={navigatingBack}
+        themeTestId="kb-detail-theme-switcher"
+        langTestId="kb-detail-lang-switcher"
+        actions={
+          <IconActionButton
+            testId="kb-delete"
+            onClick={() => void handleDeleteKB()}
+            pending={deletingKb}
+            variant="danger"
+            title={t('common.delete')}
+            icon={<Trash2 className="w-4 h-4" />}
+          />
+        }
+      />
 
       {currentKB && <KBPublishPanel kb={currentKB} />}
 
@@ -219,9 +253,22 @@ export default function KBDetailPage() {
                           {formatSize(doc.file_size)} · {relativeTime(doc.created_at)}
                         </p>
                       </div>
-                      <button onClick={() => handleDeleteDoc(doc.id)}
-                        className="p-1 text-surface-600 hover:text-red-400 shrink-0" title={t('common.delete')}>
-                        <Trash2 className="w-3.5 h-3.5" />
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteDoc(doc.id)}
+                        disabled={deletingDocId === doc.id}
+                        className={`p-1 shrink-0 transition-all ${
+                          deletingDocId === doc.id
+                            ? 'text-red-400/70 cursor-wait'
+                            : 'text-surface-600 hover:text-red-400 active:scale-90'
+                        }`}
+                        title={t('common.delete')}
+                      >
+                        {deletingDocId === doc.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
@@ -272,6 +319,8 @@ export default function KBDetailPage() {
                 onSelect={handleSelectSession}
                 onCreate={handleCreateSession}
                 onDelete={handleDeleteSession}
+                creating={creatingSession}
+                deletingId={deletingSessionId}
               />
             </div>
 
@@ -287,9 +336,13 @@ export default function KBDetailPage() {
                     <button
                       type="button"
                       data-testid="chat-new-session"
-                      onClick={handleCreateSession}
-                      className="btn-primary mt-6 text-sm"
+                      onClick={() => void handleCreateSession()}
+                      disabled={creatingSession}
+                      className={`btn-primary mt-6 text-sm inline-flex items-center gap-2 transition-all ${
+                        creatingSession ? 'opacity-80 cursor-wait' : 'active:scale-[0.98]'
+                      }`}
                     >
+                      {creatingSession && <Loader2 className="w-4 h-4 animate-spin" />}
                       {t('chat.newSession')}
                     </button>
                   </div>

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useUserStore } from '../stores/userStore';
 import { parseApiError } from '../utils/error';
 import AuthLayout from '../components/AuthLayout';
+import SubmitButton from '../components/SubmitButton';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -82,9 +83,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3 mt-2">
-          {loading ? t('auth.loggingIn') : t('auth.loginButton')}
-        </button>
+        <SubmitButton
+          loading={loading}
+          loadingLabel={t('auth.loggingIn')}
+          label={t('auth.loginButton')}
+          className="btn-primary w-full py-3 mt-2"
+        />
       </form>
     </AuthLayout>
   );

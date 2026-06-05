@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import PageTransitionOutlet from '../components/PageTransitionOutlet';
+import { useUserStore } from '../stores/userStore';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import DashboardPage from '../pages/DashboardPage';
@@ -9,14 +10,14 @@ import AdminPage from '../pages/AdminPage';
 import AccountPage from '../pages/AccountPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('access_token');
-  if (!token) return <Navigate to="/login" replace />;
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('access_token');
-  if (token) return <Navigate to="/dashboard" replace />;
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 

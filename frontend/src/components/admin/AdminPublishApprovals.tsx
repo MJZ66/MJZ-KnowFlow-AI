@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, X, Globe } from 'lucide-react';
+import { Check, Loader2, X, Globe } from 'lucide-react';
 import { api } from '../../api/client';
 import { parseApiError } from '../../utils/error';
 import type { KBPublishRequest } from '../../types';
@@ -12,6 +12,7 @@ export default function AdminPublishApprovals() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actingId, setActingId] = useState<number | null>(null);
+  const [actingAction, setActingAction] = useState<'approve' | 'reject' | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,6 +32,7 @@ export default function AdminPublishApprovals() {
 
   const review = async (kbId: number, action: 'approve' | 'reject') => {
     setActingId(kbId);
+    setActingAction(action);
     setError('');
     try {
       await api(`/api/admin/kb-publish-requests/${kbId}/${action}`, { method: 'POST' });
@@ -39,6 +41,7 @@ export default function AdminPublishApprovals() {
       setError(parseApiError(err));
     } finally {
       setActingId(null);
+      setActingAction(null);
     }
   };
 
@@ -85,20 +88,32 @@ export default function AdminPublishApprovals() {
               type="button"
               data-testid={`publish-approve-${item.id}`}
               disabled={actingId === item.id}
-              onClick={() => review(item.id, 'approve')}
-              className="btn-primary flex items-center gap-1.5 text-sm py-2"
+              onClick={() => void review(item.id, 'approve')}
+              className={`btn-primary flex items-center gap-1.5 text-sm py-2 transition-all ${
+                actingId === item.id ? 'opacity-80 cursor-wait' : 'active:scale-[0.98]'
+              }`}
             >
-              <Check className="w-4 h-4" />
+              {actingId === item.id && actingAction === 'approve' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
               {t('admin.approve')}
             </button>
             <button
               type="button"
               data-testid={`publish-reject-${item.id}`}
               disabled={actingId === item.id}
-              onClick={() => review(item.id, 'reject')}
-              className="btn-danger flex items-center gap-1.5 text-sm py-2"
+              onClick={() => void review(item.id, 'reject')}
+              className={`btn-danger flex items-center gap-1.5 text-sm py-2 transition-all ${
+                actingId === item.id ? 'opacity-80 cursor-wait' : 'active:scale-[0.98]'
+              }`}
             >
-              <X className="w-4 h-4" />
+              {actingId === item.id && actingAction === 'reject' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <X className="w-4 h-4" />
+              )}
               {t('admin.reject')}
             </button>
           </div>
