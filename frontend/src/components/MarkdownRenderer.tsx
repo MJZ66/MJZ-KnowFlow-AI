@@ -10,7 +10,28 @@ function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(text: string): string {
+  return escapeHtml(text);
+}
+
+/** Allow only http/https links to prevent javascript: / data: XSS. */
+function safeHref(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed, 'https://example.invalid');
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.href;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function renderMarkdown(text: string): string {
@@ -47,9 +68,12 @@ function renderMarkdown(text: string): string {
   // Blockquotes
   html = html.replace(/^&gt;\s?(.+)$/gm, '<blockquote class="border-l-2 border-brand-500 pl-3 italic text-surface-400 my-2">$1</blockquote>');
 
-  // Links [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" class="text-brand-400 hover:text-brand-300 underline" target="_blank" rel="noopener">$1</a>');
+  // Links [text](url) — http/https only
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, rawUrl: string) => {
+    const href = safeHref(rawUrl);
+    if (!href) return label;
+    return `<a href="${escapeAttr(href)}" class="text-brand-400 hover:text-brand-300 underline" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  });
 
   // Line breaks (double newline → paragraph)
   html = html.replace(/\n\n/g, '</p><p class="mb-2">');
@@ -73,3 +97,6 @@ export default function MarkdownRenderer({ content }: { content: string }) {
     />
   );
 }
+
+/** Exported for unit tests. */
+export { safeHref, renderMarkdown };

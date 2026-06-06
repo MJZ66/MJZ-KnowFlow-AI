@@ -486,7 +486,7 @@ class RAGService:
             raise
         except Exception as e:
             logger.exception("Retrieval failed")
-            yield {"event": "error", "data": {"message": f"检索失败: {str(e)}"}}
+            yield {"event": "error", "data": {"message": "检索失败，请稍后重试。"}}
             return
 
         record_rag_retrieval()
@@ -572,7 +572,7 @@ class RAGService:
                 yield {"event": "token", "data": {"content": token}}
         except Exception as e:
             logger.exception("LLM streaming failed")
-            yield {"event": "error", "data": {"message": f"生成回答失败: {str(e)}"}}
+            yield {"event": "error", "data": {"message": "生成回答失败，请稍后重试。"}}
             return
 
         # Step 6: Yield references and done

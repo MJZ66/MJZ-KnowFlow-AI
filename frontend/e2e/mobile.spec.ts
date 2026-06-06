@@ -13,8 +13,8 @@ test.describe('KnowFlow Mobile E2E', () => {
     await createKnowledgeBase(page, `Mobile KB ${user.suffix}`);
 
     const kbId = page.url().match(/\/kbs\/(\d+)/)?.[1]!;
-    const doc = await uploadStandardDocument(page.request, user.token, kbId);
-    await pollDocumentCompleted(page.request, user.token, doc.id);
+    const doc = await uploadStandardDocument(page.request, kbId);
+    await pollDocumentCompleted(page.request, doc.id);
 
     await page.goto(page.url());
     await expect(page.getByTestId('mobile-pane-docs')).toBeVisible({ timeout: 15000 });

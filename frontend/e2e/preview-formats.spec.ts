@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import {
-  API_BASE,
   createKnowledgeBase,
   pollDocumentCompleted,
   registerAndLogin,
@@ -14,20 +13,17 @@ test.describe('Multi-format document preview', () => {
     const user = await registerAndLogin(page, 'prev');
     const kbId = await createKnowledgeBase(page, `Preview KB ${user.suffix}`);
 
-    const txtRes = await page.request.post(`${API_BASE}/api/kbs/${kbId}/documents/upload`, {
-      headers: { Authorization: `Bearer ${user.token}` },
+    const txtRes = await page.request.post(`/api/kbs/${kbId}/documents/upload`, {
       multipart: {
         file: { name: 'preview.txt', mimeType: 'text/plain', buffer: Buffer.from(STANDARD_DOC, 'utf-8') },
       },
     });
-    const pngRes = await page.request.post(`${API_BASE}/api/kbs/${kbId}/documents/upload`, {
-      headers: { Authorization: `Bearer ${user.token}` },
+    const pngRes = await page.request.post(`/api/kbs/${kbId}/documents/upload`, {
       multipart: {
         file: { name: 'preview.png', mimeType: 'image/png', buffer: MINI_PNG },
       },
     });
-    const xlsxRes = await page.request.post(`${API_BASE}/api/kbs/${kbId}/documents/upload`, {
-      headers: { Authorization: `Bearer ${user.token}` },
+    const xlsxRes = await page.request.post(`/api/kbs/${kbId}/documents/upload`, {
       multipart: {
         file: {
           name: 'preview.xlsx',
@@ -41,9 +37,9 @@ test.describe('Multi-format document preview', () => {
     const pngDoc = await pngRes.json();
     const xlsxDoc = await xlsxRes.json();
 
-    await pollDocumentCompleted(page.request, user.token, txtDoc.id);
-    await pollDocumentCompleted(page.request, user.token, pngDoc.id);
-    await pollDocumentCompleted(page.request, user.token, xlsxDoc.id);
+    await pollDocumentCompleted(page.request, txtDoc.id);
+    await pollDocumentCompleted(page.request, pngDoc.id);
+    await pollDocumentCompleted(page.request, xlsxDoc.id);
 
     await page.reload();
 

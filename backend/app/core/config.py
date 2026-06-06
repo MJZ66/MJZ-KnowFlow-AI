@@ -22,7 +22,22 @@ class Settings(BaseSettings):
     RUN_MIGRATIONS_ON_START: bool = True
 
     # ============================================
-    # Security
+    # Security — registration & metrics
+    # ============================================
+    ALLOW_OPEN_REGISTRATION: bool = True
+    FIRST_USER_SUPER_ADMIN: bool = True
+    METRICS_TOKEN: str = ""
+    ACCESS_TOKEN_COOKIE_NAME: str = "kf_access"
+    REFRESH_TOKEN_COOKIE_NAME: str = "kf_refresh"
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+    COOKIE_DOMAIN: str = ""
+    AUTH_RETURN_TOKENS_IN_BODY: bool = False
+    CSRF_ENABLED: bool = True
+    CSRF_COOKIE_NAME: str = "kf_csrf"
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+    CSRF_COOKIE_MAX_AGE: int = 7 * 24 * 3600
+
     # ============================================
     SECRET_KEY: str = "change-me-to-a-random-secret-key-at-least-32-chars"
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000"
@@ -152,7 +167,7 @@ class Settings(BaseSettings):
     SEED_ADMIN_ON_START: bool = True
     ADMIN_EMAIL: str = "admin@knowflow.local"
     ADMIN_USERNAME: str = "knowflow_admin"
-    ADMIN_PASSWORD: str = "Admin@KnowFlow2026"
+    ADMIN_PASSWORD: str = "CHANGE_ME_ON_FIRST_LOGIN"
     SEED_ADMIN_UPDATE_PASSWORD: bool = False
     USER_ONLINE_THRESHOLD_MINUTES: int = 5
 
@@ -185,6 +200,7 @@ class Settings(BaseSettings):
 
 
 DEFAULT_SECRET_KEY = "change-me-to-a-random-secret-key-at-least-32-chars"
+DEFAULT_ADMIN_PASSWORD = "CHANGE_ME_ON_FIRST_LOGIN"
 
 
 def validate_production_settings(settings: Settings | None = None) -> None:
@@ -203,6 +219,20 @@ def validate_production_settings(settings: Settings | None = None) -> None:
         raise RuntimeError("SECRET_KEY is insecure for production.")
     if s.APP_ENV != "production" and insecure:
         log.warning("SECRET_KEY is using the default value — acceptable in development only.")
+
+    if s.APP_ENV == "production":
+        if s.ADMIN_PASSWORD in (DEFAULT_ADMIN_PASSWORD, "Admin@KnowFlow2026"):
+            log.warning(
+                "ADMIN_PASSWORD is using a template default — change it before production use."
+            )
+        if s.ALLOW_OPEN_REGISTRATION:
+            log.warning(
+                "ALLOW_OPEN_REGISTRATION=true in production — set false to disable public signup."
+            )
+        if s.METRICS_ENABLED and not s.METRICS_TOKEN:
+            log.warning(
+                "METRICS_ENABLED without METRICS_TOKEN — /api/metrics is publicly readable."
+            )
 
     if s.APP_ENV == "production" and s.EMBEDDING_PROVIDER == "hash":
         log.warning(

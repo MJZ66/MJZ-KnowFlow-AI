@@ -12,8 +12,8 @@ test.describe('KnowFlow E2E', () => {
     const user = await registerAndLogin(page, 'pw');
     const kbId = await createKnowledgeBase(page, `PW KB ${user.suffix}`);
 
-    const doc = await uploadStandardDocument(page.request, user.token, kbId);
-    await pollDocumentCompleted(page.request, user.token, doc.id);
+    const doc = await uploadStandardDocument(page.request, kbId);
+    await pollDocumentCompleted(page.request, doc.id);
 
     await page.getByTestId('chat-new-session').first().click();
 
@@ -53,8 +53,7 @@ test.describe('KnowFlow E2E', () => {
   test('dashboard KB pagination controls', async ({ page }) => {
     const user = await registerAndLogin(page, 'pg');
     for (let i = 0; i < 3; i++) {
-      await page.request.post(`${process.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/kbs`, {
-        headers: { Authorization: `Bearer ${user.token}`, 'Content-Type': 'application/json' },
+      await page.request.post('/api/kbs', {
         data: { name: `Pag KB ${i}`, description: '', visibility: 'private' },
       });
     }

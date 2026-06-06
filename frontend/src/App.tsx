@@ -5,17 +5,22 @@ import { router } from './routes';
 import LogoutOverlay from './components/LogoutOverlay';
 import ToastContainer from './components/ToastContainer';
 import ConfirmModal from './components/ConfirmModal';
+import { ensureCsrfToken } from './api/client';
 import { useUserStore } from './stores/userStore';
 
 export default function App() {
   const fetchMe = useUserStore((s) => s.fetchMe);
-  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const authChecked = useUserStore((s) => s.authChecked);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchMe();
+    async function bootstrap() {
+      await ensureCsrfToken();
+      if (!authChecked) {
+        await fetchMe();
+      }
     }
-  }, [isAuthenticated, fetchMe]);
+    bootstrap();
+  }, [authChecked, fetchMe]);
 
   // Ensure i18n is initialized
   useTranslation();

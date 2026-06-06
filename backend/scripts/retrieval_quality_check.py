@@ -131,12 +131,10 @@ def setup_kb_and_doc(client: httpx.Client) -> tuple[dict, int]:
     }
     r = client.post(f"{BASE}/api/auth/register", json=user)
     r.raise_for_status()
-    token = r.json()["access_token"]
-    headers = auth_headers(token)
+    headers: dict = {}
 
     kb = client.post(
         f"{BASE}/api/kbs",
-        headers=headers,
         json={"name": f"Retrieval QA {suffix}", "description": "quality check", "visibility": "private"},
     ).json()
 
@@ -145,7 +143,6 @@ def setup_kb_and_doc(client: httpx.Client) -> tuple[dict, int]:
     with doc_path.open("rb") as f:
         doc = client.post(
             f"/api/kbs/{kb['id']}/documents/upload",
-            headers=headers,
             files={"file": ("中文测试文档.txt", f, "text/plain")},
         )
     doc.raise_for_status()
@@ -172,6 +169,7 @@ def main() -> int:
     print("=" * 60)
 
     with httpx.Client(timeout=TIMEOUT, base_url=BASE) as client:
+        install_csrf_hook(client)
         health = client.get("/api/health")
         health.raise_for_status()
         headers, kb_id = setup_kb_and_doc(client)
@@ -187,4 +185,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from tests.e2e_helpers import install_csrf_hook
     raise SystemExit(main())

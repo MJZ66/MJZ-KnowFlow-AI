@@ -34,7 +34,6 @@ export interface RegisteredUser {
   email: string;
   password: string;
   username: string;
-  token: string;
   suffix: string;
 }
 
@@ -51,10 +50,7 @@ export async function registerAndLogin(page: Page, prefix = 'pw'): Promise<Regis
   await page.getByRole('button', { name: /注册|sign up|register/i }).click();
   await expect(page).toHaveURL(/dashboard/, { timeout: 20000 });
 
-  const token = await page.evaluate(() => localStorage.getItem('access_token'));
-  expect(token).toBeTruthy();
-
-  return { email, password, username, token: token!, suffix };
+  return { email, password, username, suffix };
 }
 
 export async function createKnowledgeBase(page: Page, name: string): Promise<string> {
@@ -69,11 +65,9 @@ export async function createKnowledgeBase(page: Page, name: string): Promise<str
 
 export async function uploadStandardDocument(
   request: APIRequestContext,
-  token: string,
   kbId: string,
 ): Promise<{ id: number }> {
-  const uploadRes = await request.post(`${API_BASE}/api/kbs/${kbId}/documents/upload`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const uploadRes = await request.post(`/api/kbs/${kbId}/documents/upload`, {
     multipart: {
       file: {
         name: 'pw-test.txt',
@@ -88,14 +82,11 @@ export async function uploadStandardDocument(
 
 export async function pollDocumentCompleted(
   request: APIRequestContext,
-  token: string,
   docId: number,
   maxAttempts = 60,
 ): Promise<void> {
   for (let i = 0; i < maxAttempts; i++) {
-    const st = await request.get(`${API_BASE}/api/documents/${docId}/status`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const st = await request.get(`/api/documents/${docId}/status`);
     const body = await st.json();
     if (body.status === 'completed') return;
     if (body.status === 'failed') throw new Error(`Document failed: ${body.error_message}`);

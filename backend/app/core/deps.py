@@ -3,31 +3,44 @@ FastAPI dependency injection utilities.
 Provides reusable dependencies for auth, database access, and permission checks.
 """
 
-from typing import Optional
-
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.models import User, UserRole
 from app.services.user_activity import touch_activity
 
-security_scheme = HTTPBearer()
+settings = get_settings()
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _extract_access_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    if credentials and credentials.credentials:
+        return credentials.credentials
+    return request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Validate JWT and return the current authenticated user.
+    """Validate JWT from HttpOnly cookie or Authorization header."""
+    token = _extract_access_token(request, credentials)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated.",
+        )
 
-    Raises 401 if token is missing, invalid, expired, or user not found.
-    """
-    token = credentials.credentials
     try:
         payload = decode_token(token)
         token_type = payload.get("type")

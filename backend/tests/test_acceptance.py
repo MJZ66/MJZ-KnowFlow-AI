@@ -12,8 +12,8 @@ from tests.conftest import requires_llm
 from tests.e2e_helpers import (
     BASE,
     TIMEOUT,
-    auth_headers,
     make_chinese_txt,
+    make_api_client,
     parse_sse_stream,
     poll_document,
     unique_user,
@@ -22,8 +22,9 @@ from tests.e2e_helpers import (
 
 @pytest.fixture(scope="module")
 def api_client():
-    with httpx.Client(timeout=TIMEOUT, base_url=BASE) as client:
-        yield client
+    client = make_api_client()
+    yield client
+    client.close()
 
 
 @pytest.fixture(scope="module")
@@ -31,8 +32,9 @@ def auth_ctx(api_client: httpx.Client):
     user = unique_user()
     r = api_client.post("/api/auth/register", json=user)
     assert r.status_code == 201, r.text
-    token = r.json()["access_token"]
-    return {"headers": auth_headers(token), "user": user}
+    me = api_client.get("/api/auth/me")
+    assert me.status_code == 200, me.text
+    return {"headers": {}, "user": user}
 
 
 def test_health(api_client: httpx.Client):
@@ -47,7 +49,7 @@ def _register_password_test_user(api_client: httpx.Client) -> dict:
     assert reg.status_code == 201, reg.text
     return {
         "user": user,
-        "headers": auth_headers(reg.json()["access_token"]),
+        "headers": {},
     }
 
 

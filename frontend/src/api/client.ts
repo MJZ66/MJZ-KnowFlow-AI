@@ -1,8 +1,10 @@
 /**
- * HTTP client wrapper with JWT token management.
+ * HTTP client — JWT in HttpOnly cookies + CSRF double-submit protection.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const CSRF_HEADER = 'X-CSRF-Token';
+const CSRF_COOKIE = 'kf_csrf';
 
 interface ApiErrorPayload {
   code?: string;
@@ -10,6 +12,12 @@ interface ApiErrorPayload {
   message_en?: string;
   detail?: string;
 }
+
+const FETCH_CREDENTIALS: RequestCredentials = 'include';
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+let csrfToken: string | null = null;
+let csrfPromise: Promise<string> | null = null;
 
 function formatApiErrorBody(data: ApiErrorPayload & { detail?: unknown }): string {
   if (data.message || data.message_en) {
@@ -23,78 +31,163 @@ function formatApiErrorBody(data: ApiErrorPayload & { detail?: unknown }): strin
   return `Request failed`;
 }
 
-function getTokens(): { access: string | null; refresh: string | null } {
-  return {
-    access: localStorage.getItem('access_token'),
-    refresh: localStorage.getItem('refresh_token'),
-  };
+function readCsrfCookie(): string | null {
+  const prefix = `${CSRF_COOKIE}=`;
+  for (const part of document.cookie.split(';')) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(trimmed.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
+/** Bootstrap or refresh CSRF token (required before any mutating request). */
+export async function ensureCsrfToken(force = false): Promise<string> {
+  if (!force && csrfToken) return csrfToken;
+
+  const fromCookie = readCsrfCookie();
+  if (!force && fromCookie) {
+    csrfToken = fromCookie;
+    return csrfToken;
+  }
+
+  if (csrfPromise) return csrfPromise;
+
+  csrfPromise = (async () => {
+    const res = await fetch(`${API_BASE}/api/auth/csrf`, {
+      credentials: FETCH_CREDENTIALS,
+    });
+    if (!res.ok) {
+      throw new Error('Failed to obtain CSRF token');
+    }
+    const data = (await res.json()) as { csrf_token: string };
+    csrfToken = data.csrf_token || readCsrfCookie();
+    if (!csrfToken) {
+      throw new Error('CSRF token missing from response');
+    }
+    return csrfToken;
+  })();
+
+  try {
+    return await csrfPromise;
+  } finally {
+    csrfPromise = null;
+  }
 }
 
-export function clearTokens() {
+export function resetCsrfToken() {
+  csrfToken = null;
+}
+
+/** Remove legacy localStorage tokens from pre-cookie auth. */
+export function clearLegacyTokens() {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const { refresh } = getTokens();
-  if (!refresh) return null;
+/** @deprecated No-op — tokens live in HttpOnly cookies. */
+export function setTokens(_access: string, _refresh: string) {
+  clearLegacyTokens();
+}
 
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refresh }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    setTokens(data.access_token, data.refresh_token);
-    return data.access_token;
-  } catch {
-    return null;
+/** @deprecated Clears server session via logout; kept for compatibility. */
+export function clearTokens() {
+  clearLegacyTokens();
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const token = await ensureCsrfToken();
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: FETCH_CREDENTIALS,
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER]: token,
+        },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        await ensureCsrfToken(true);
+      }
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function buildHeaders(
+  options: RequestInit,
+  existing: Record<string, string>,
+): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { ...existing };
+
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
   }
+
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (MUTATING_METHODS.has(method)) {
+    headers[CSRF_HEADER] = await ensureCsrfToken();
+  }
+
+  return headers;
+}
+
+async function fetchWithAuth(path: string, options: RequestInit = {}): Promise<Response> {
+  let headers = await buildHeaders(options, (options.headers as Record<string, string>) ?? {});
+
+  let res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: FETCH_CREDENTIALS,
+  });
+
+  if (res.status === 403) {
+    const body = await res.clone().json().catch(() => ({}));
+    if (body?.code === 'CSRF_INVALID') {
+      await ensureCsrfToken(true);
+      headers = await buildHeaders(options, (options.headers as Record<string, string>) ?? {});
+      res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        credentials: FETCH_CREDENTIALS,
+      });
+    }
+  }
+
+  if (res.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      headers = await buildHeaders(options, (options.headers as Record<string, string>) ?? {});
+      res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        credentials: FETCH_CREDENTIALS,
+      });
+    }
+  }
+
+  return res;
 }
 
 export async function api<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const { access } = getTokens();
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
+  const res = await fetchWithAuth(path, options);
 
-  if (access) {
-    headers['Authorization'] = `Bearer ${access}`;
-  }
-
-  // Don't set Content-Type for FormData (browser sets it with boundary)
-  if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  let res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
-  // Try refresh on 401
-  if (res.status === 401 && access) {
-    const newAccess = await refreshAccessToken();
-    if (newAccess) {
-      headers['Authorization'] = `Bearer ${newAccess}`;
-      res = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers,
-      });
-    }
-  }
-
-  // Handle 204 No Content
   if (res.status === 204) {
     return undefined as T;
   }
@@ -112,30 +205,13 @@ export async function uploadFile<T = unknown>(
   path: string,
   file: File
 ): Promise<T> {
-  const { access } = getTokens();
   const formData = new FormData();
   formData.append('file', file);
 
-  let res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchWithAuth(path, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${access}`,
-    },
     body: formData,
   });
-
-  if (res.status === 401 && access) {
-    const newAccess = await refreshAccessToken();
-    if (newAccess) {
-      res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${newAccess}`,
-        },
-        body: formData,
-      });
-    }
-  }
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -146,21 +222,7 @@ export async function uploadFile<T = unknown>(
 }
 
 export async function fetchDocumentBlob(path: string): Promise<Blob> {
-  const { access } = getTokens();
-  const headers: Record<string, string> = {};
-  if (access) {
-    headers.Authorization = `Bearer ${access}`;
-  }
-
-  let res = await fetch(`${API_BASE}${path}`, { headers });
-
-  if (res.status === 401 && access) {
-    const newAccess = await refreshAccessToken();
-    if (newAccess) {
-      headers.Authorization = `Bearer ${newAccess}`;
-      res = await fetch(`${API_BASE}${path}`, { headers });
-    }
-  }
+  const res = await fetchWithAuth(path);
 
   if (!res.ok) {
     throw new Error('Failed to load file');
@@ -174,16 +236,14 @@ export function uploadFileWithProgress<T = unknown>(
   file: File,
   onProgress?: (percent: number) => void,
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const { access } = getTokens();
+  return ensureCsrfToken().then((token) => new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
 
     xhr.open('POST', `${API_BASE}${path}`);
-    if (access) {
-      xhr.setRequestHeader('Authorization', `Bearer ${access}`);
-    }
+    xhr.withCredentials = true;
+    xhr.setRequestHeader(CSRF_HEADER, token);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
@@ -208,25 +268,20 @@ export function uploadFileWithProgress<T = unknown>(
 
     xhr.onerror = () => reject(new Error('Upload failed'));
     xhr.send(formData);
-  });
+  }));
 }
 
 /**
  * SSE streaming request — returns a ReadableStream for manual processing.
  */
-export function streamRequest(
+export async function streamRequest(
   path: string,
   body: unknown,
   signal?: AbortSignal
 ): Promise<Response> {
-  const { access } = getTokens();
-
-  return fetch(`${API_BASE}${path}`, {
+  return fetchWithAuth(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${access}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
   });

@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.permissions import KBAccessLevel, require_kb_access
 from app.core.config import get_settings
+from app.core.paths import resolve_upload_path
 from app.models import Document, DocumentChunk, DocumentStatus, User, BackgroundTask, TaskStatus
 from app.schemas.document import (
     DocumentResponse,
@@ -230,12 +231,7 @@ async def get_document_status(
     current_user: User = Depends(get_current_user),
 ):
     """Get the processing status of a document."""
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
-    doc = result.scalar_one_or_none()
-    if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+    doc = await _get_document_with_access(db, document_id, current_user)
 
     task_result = await db.execute(
         select(BackgroundTask)
@@ -343,7 +339,7 @@ async def get_document_file(
     """Download original uploaded file for inline preview (PDF, images)."""
     doc = await _get_document_with_access(db, document_id, current_user)
 
-    file_path = Path(doc.file_path)
+    file_path = resolve_upload_path(doc.file_path)
     if not file_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk.")
 

@@ -18,6 +18,8 @@ class ErrorCode(str, Enum):
     AUTH_INVALID_CREDENTIALS = "AUTH_INVALID_CREDENTIALS"
     AUTH_WRONG_CURRENT_PASSWORD = "AUTH_WRONG_CURRENT_PASSWORD"
     AUTH_PASSWORD_UNCHANGED = "AUTH_PASSWORD_UNCHANGED"
+    CSRF_INVALID = "CSRF_INVALID"
+    CSRF_ORIGIN_DENIED = "CSRF_ORIGIN_DENIED"
 
     # Permission
     PERMISSION_DENIED = "PERMISSION_DENIED"
@@ -62,6 +64,8 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.AUTH_INVALID_CREDENTIALS: "邮箱或密码错误",
     ErrorCode.AUTH_WRONG_CURRENT_PASSWORD: "当前密码不正确",
     ErrorCode.AUTH_PASSWORD_UNCHANGED: "新密码不能与当前密码相同",
+    ErrorCode.CSRF_INVALID: "CSRF 校验失败，请刷新页面后重试",
+    ErrorCode.CSRF_ORIGIN_DENIED: "请求来源不被允许",
     ErrorCode.PERMISSION_DENIED: "无权限访问",
     ErrorCode.ADMIN_REQUIRED: "需要管理员权限",
     ErrorCode.KB_NOT_FOUND: "知识库不存在",
@@ -92,6 +96,8 @@ ERROR_MESSAGES_EN: dict[ErrorCode, str] = {
     ErrorCode.AUTH_INVALID_CREDENTIALS: "Invalid email or password",
     ErrorCode.AUTH_WRONG_CURRENT_PASSWORD: "Current password is incorrect",
     ErrorCode.AUTH_PASSWORD_UNCHANGED: "New password must differ from the current password",
+    ErrorCode.CSRF_INVALID: "CSRF validation failed",
+    ErrorCode.CSRF_ORIGIN_DENIED: "Request origin not allowed",
     ErrorCode.PERMISSION_DENIED: "Permission denied",
     ErrorCode.ADMIN_REQUIRED: "Admin privileges required",
     ErrorCode.KB_NOT_FOUND: "Knowledge base not found",

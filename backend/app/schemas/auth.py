@@ -30,13 +30,17 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: str | None = None
+    refresh_token: str | None = None
     token_type: str = "bearer"
 
 
+class CsrfResponse(BaseModel):
+    csrf_token: str
+
+
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):

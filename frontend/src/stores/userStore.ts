@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { User, AuthTokens } from '../types';
-import { api, setTokens, clearTokens } from '../api/client';
+import type { User } from '../types';
+import { api, clearLegacyTokens, ensureCsrfToken, resetCsrfToken } from '../api/client';
 import { useKBStore } from './kbStore';
 import { useChatStore } from './chatStore';
 
@@ -11,6 +11,7 @@ interface UserState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLoggingOut: boolean;
+  authChecked: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, username: string) => Promise<void>;
@@ -19,44 +20,45 @@ interface UserState {
   logout: () => Promise<void>;
 }
 
+clearLegacyTokens();
+
 export const useUserStore = create<UserState>((set) => ({
   user: null,
-  isAuthenticated: !!localStorage.getItem('access_token'),
+  isAuthenticated: false,
   isLoading: false,
   isLoggingOut: false,
+  authChecked: false,
 
   login: async (email, password) => {
-    const tokens = await api<AuthTokens>('/api/auth/login', {
+    await ensureCsrfToken();
+    await api('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    setTokens(tokens.access_token, tokens.refresh_token);
-    set({ isAuthenticated: true });
-    // Fetch user info
+    await ensureCsrfToken(true);
     const user = await api<User>('/api/auth/me');
-    set({ user });
+    set({ user, isAuthenticated: true, authChecked: true });
   },
 
   register: async (email, password, username) => {
-    const tokens = await api<AuthTokens>('/api/auth/register', {
+    await ensureCsrfToken();
+    await api('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, username }),
     });
-    setTokens(tokens.access_token, tokens.refresh_token);
-    set({ isAuthenticated: true });
+    await ensureCsrfToken(true);
     const user = await api<User>('/api/auth/me');
-    set({ user });
+    set({ user, isAuthenticated: true, authChecked: true });
   },
 
   fetchMe: async () => {
-    if (!localStorage.getItem('access_token')) return;
     set({ isLoading: true });
     try {
       const user = await api<User>('/api/auth/me');
-      set({ user, isAuthenticated: true });
+      set({ user, isAuthenticated: true, authChecked: true });
     } catch {
-      clearTokens();
-      set({ user: null, isAuthenticated: false });
+      clearLegacyTokens();
+      set({ user: null, isAuthenticated: false, authChecked: true });
     } finally {
       set({ isLoading: false });
     }
@@ -77,9 +79,15 @@ export const useUserStore = create<UserState>((set) => ({
     if (isLoggingOut) return;
     set({ isLoggingOut: true });
     await new Promise((resolve) => setTimeout(resolve, LOGOUT_ANIMATION_MS));
-    clearTokens();
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Still clear local state if server unreachable
+    }
+    clearLegacyTokens();
+    resetCsrfToken();
     useChatStore.getState().reset();
     useKBStore.getState().reset();
-    set({ user: null, isAuthenticated: false, isLoggingOut: false });
+    set({ user: null, isAuthenticated: false, isLoggingOut: false, authChecked: true });
   },
 }));

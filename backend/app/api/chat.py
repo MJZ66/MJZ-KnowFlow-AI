@@ -36,6 +36,26 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+async def _get_session_with_kb_access(
+    db: AsyncSession,
+    session_id: int,
+    current_user: User,
+    level: KBAccessLevel = KBAccessLevel.VIEWER,
+) -> ChatSession:
+    """Load a chat session owned by the user and verify KB access."""
+    result = await db.execute(
+        select(ChatSession).where(
+            ChatSession.id == session_id,
+            ChatSession.user_id == current_user.id,
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    await require_kb_access(db, session.knowledge_base_id, current_user, level)
+    return session
+
+
 # ============================================
 # Session Management
 # ============================================
@@ -87,15 +107,7 @@ async def delete_session(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a chat session and all its messages."""
-    result = await db.execute(
-        select(ChatSession).where(
-            ChatSession.id == session_id,
-            ChatSession.user_id == current_user.id,
-        )
-    )
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    session = await _get_session_with_kb_access(db, session_id, current_user)
 
     await db.delete(session)
     await db.flush()
@@ -113,15 +125,7 @@ async def get_messages(
     current_user: User = Depends(get_current_user),
 ):
     """Get messages for a chat session, oldest first."""
-    result = await db.execute(
-        select(ChatSession).where(
-            ChatSession.id == session_id,
-            ChatSession.user_id == current_user.id,
-        )
-    )
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    await _get_session_with_kb_access(db, session_id, current_user)
 
     msg_result = await db.execute(
         select(ChatMessage)
@@ -140,15 +144,7 @@ async def send_message(
     current_user: User = Depends(get_current_user),
 ):
     """Save a user message (non-streaming fallback)."""
-    result = await db.execute(
-        select(ChatSession).where(
-            ChatSession.id == session_id,
-            ChatSession.user_id == current_user.id,
-        )
-    )
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    await _get_session_with_kb_access(db, session_id, current_user)
 
     message = ChatMessage(
         session_id=session_id,
@@ -182,16 +178,8 @@ async def stream_chat(
     - done             — Complete (includes full answer + refs)
     - error            — Error occurred
     """
-    # Validate session
-    result = await db.execute(
-        select(ChatSession).where(
-            ChatSession.id == session_id,
-            ChatSession.user_id == current_user.id,
-        )
-    )
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    # Validate session and KB access
+    session = await _get_session_with_kb_access(db, session_id, current_user)
 
     kb_id = session.knowledge_base_id
 
@@ -247,9 +235,12 @@ async def stream_chat(
                     if event_type == "error":
                         return
 
-            except Exception as e:
+            except Exception:
                 logger.exception("SSE stream error")
-                error_data = json.dumps({"message": str(e)}, ensure_ascii=False)
+                error_data = json.dumps(
+                    {"message": "An error occurred while generating the response."},
+                    ensure_ascii=False,
+                )
                 yield f"event: error\ndata: {error_data}\n\n"
                 return
 

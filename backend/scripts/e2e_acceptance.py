@@ -42,6 +42,19 @@ def auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def install_csrf(client: httpx.Client) -> None:
+    r = client.get(f"{BASE}/api/auth/csrf")
+    r.raise_for_status()
+
+    def _hook(request: httpx.Request) -> None:
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            token = client.cookies.get("kf_csrf")
+            if token:
+                request.headers["X-CSRF-Token"] = token
+
+    client.event_hooks.setdefault("request", []).append(_hook)
+
+
 def poll_document(client: httpx.Client, doc_id: int, headers: dict, timeout_sec: int = 120) -> dict:
     deadline = time.time() + timeout_sec
     last = None
@@ -89,6 +102,7 @@ def main() -> int:
     empty_txt.write_text("   \n\n  ", encoding="utf-8")
 
     with httpx.Client(timeout=TIMEOUT) as client:
+        install_csrf(client)
         # --- Health ---
         r = client.get(f"{BASE}/api/health")
         if r.status_code == 200 and r.json().get("status") == "ok":
@@ -107,9 +121,12 @@ def main() -> int:
             fail("Register user", f"{r.status_code} {r.text}")
             return 1
 
-        tokens = r.json()
-        access = tokens["access_token"]
-        headers = auth_headers(access)
+        me = client.get(f"{BASE}/api/auth/me")
+        if me.status_code != 200:
+            fail("Auth cookie session", me.text)
+            return 1
+
+        headers: dict = {}
 
         # --- Error format (structured) ---
         r = client.post(f"{BASE}/api/auth/login", json={

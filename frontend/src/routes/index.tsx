@@ -16,12 +16,37 @@ function ChatRedirect() {
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const isLoading = useUserStore((s) => s.isLoading);
+  const authChecked = useUserStore((s) => s.authChecked);
+  if (!authChecked || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const user = useUserStore((s) => s.user);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const authChecked = useUserStore((s) => s.authChecked);
+  const isLoading = useUserStore((s) => s.isLoading);
+  if (!authChecked || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+      </div>
+    );
+  }
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
@@ -74,7 +99,9 @@ export const router = createBrowserRouter([
         path: '/admin',
         element: (
           <RequireAuth>
-            <AdminPage />
+            <RequireAdmin>
+              <AdminPage />
+            </RequireAdmin>
           </RequireAuth>
         ),
       },

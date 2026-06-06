@@ -14,7 +14,7 @@ from app.services.cache_service import CacheService, build_rag_cache_key
 from tests.e2e_helpers import (
     BASE,
     TIMEOUT,
-    auth_headers,
+    make_api_client,
     make_chinese_txt,
     poll_document,
     unique_user,
@@ -43,8 +43,9 @@ def test_build_rag_cache_key_scoped_by_kb():
 
 @pytest.fixture(scope="module")
 def api_client():
-    with httpx.Client(timeout=TIMEOUT, base_url=BASE) as client:
-        yield client
+    client = make_api_client()
+    yield client
+    client.close()
 
 
 @pytest.mark.skipif(not get_settings().RAG_CACHE_ENABLED, reason="RAG cache disabled in env")
@@ -57,8 +58,8 @@ def test_cache_invalidated_after_document_upload(api_client: httpx.Client, tmp_p
 
     user = unique_user()
     reg = api_client.post("/api/auth/register", json=user)
-    headers = auth_headers(reg.json()["access_token"])
-    kb = api_client.post("/api/kbs", headers=headers, json={
+    assert reg.status_code == 201, reg.text
+    kb = api_client.post("/api/kbs", json={
         "name": "Cache KB",
         "description": "",
         "visibility": "private",
@@ -71,10 +72,9 @@ def test_cache_invalidated_after_document_upload(api_client: httpx.Client, tmp_p
     with txt.open("rb") as f:
         doc = api_client.post(
             f"/api/kbs/{kb['id']}/documents/upload",
-            headers=headers,
             files={"file": ("cache.txt", f, "text/plain")},
         ).json()
 
-    assert poll_document(api_client, doc["id"], headers)["status"] == "completed"
+    assert poll_document(api_client, doc["id"])["status"] == "completed"
     # Invalidation runs on document complete — no exception means hook is wired
     asyncio.run(_invalidate(kb["id"]))

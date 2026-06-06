@@ -23,6 +23,7 @@ from app.api.chat import router as chat_router
 from app.api.admin import router as admin_router
 from app.api.setup import router as setup_router
 from app.core.config import get_settings, validate_production_settings, validate_embedding_runtime
+from app.core.csrf import csrf_middleware_dispatch
 from app.core.health import readiness_report
 from app.core.metrics import metrics_payload, prometheus_http_middleware
 
@@ -93,13 +94,19 @@ if settings.METRICS_ENABLED:
         dispatch=prometheus_http_middleware(True),
     )
 
+if settings.CSRF_ENABLED:
+    app.add_middleware(
+        BaseHTTPMiddleware,
+        dispatch=csrf_middleware_dispatch,
+    )
+
 # CORS — configurable via ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS_LIST,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", settings.CSRF_HEADER_NAME],
 )
 
 # ============================================
@@ -117,12 +124,14 @@ app.include_router(setup_router)
 @app.get("/api/health")
 async def health_check():
     """Basic health — always returns 200 if process is up."""
-    return {
+    payload = {
         "status": "ok",
         "service": settings.APP_NAME,
         "version": "1.0.0",
-        "env": settings.APP_ENV,
     }
+    if settings.APP_ENV != "production":
+        payload["env"] = settings.APP_ENV
+    return payload
 
 
 @app.get("/api/health/live")
@@ -140,9 +149,13 @@ async def readiness():
 
 
 @app.get("/api/metrics")
-async def prometheus_metrics():
+async def prometheus_metrics(request: Request):
     """Prometheus scrape endpoint (text/plain)."""
     if not settings.METRICS_ENABLED:
         raise HTTPException(status_code=404, detail="Metrics disabled")
+    if settings.METRICS_TOKEN:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {settings.METRICS_TOKEN}":
+            raise HTTPException(status_code=401, detail="Unauthorized")
     body, content_type = metrics_payload()
     return Response(content=body, media_type=content_type)

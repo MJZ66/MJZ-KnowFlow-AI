@@ -12,17 +12,58 @@ import httpx
 
 BASE = os.environ.get("KNOWFLOW_API_BASE", "http://localhost:8000")
 TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+CSRF_COOKIE = os.environ.get("CSRF_COOKIE_NAME", "kf_csrf")
+CSRF_HEADER = os.environ.get("CSRF_HEADER_NAME", "X-CSRF-Token")
 
 
-def auth_headers(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+def auth_headers(_token: str | None = None) -> dict:
+    """Auth is cookie-based; httpx Client stores cookies after login/register."""
+    return {}
 
 
-def poll_document(client: httpx.Client, doc_id: int, headers: dict, timeout_sec: int = 120) -> dict:
+def bootstrap_csrf(client: httpx.Client) -> str:
+    """Fetch CSRF cookie required for mutating requests."""
+    r = client.get(f"{BASE}/api/auth/csrf")
+    r.raise_for_status()
+    token = client.cookies.get(CSRF_COOKIE) or r.json().get("csrf_token", "")
+    if not token:
+        raise RuntimeError("CSRF token missing after bootstrap")
+    return token
+
+
+def csrf_headers(client: httpx.Client) -> dict:
+    token = client.cookies.get(CSRF_COOKIE) or bootstrap_csrf(client)
+    return {CSRF_HEADER: token}
+
+
+def install_csrf_hook(client: httpx.Client) -> None:
+    """Attach CSRF header to all mutating requests on this client."""
+    bootstrap_csrf(client)
+
+    def _add_csrf(request: httpx.Request) -> None:
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            token = client.cookies.get(CSRF_COOKIE)
+            if not token:
+                bootstrap_csrf(client)
+                token = client.cookies.get(CSRF_COOKIE)
+            if token:
+                request.headers[CSRF_HEADER] = token
+
+    client.event_hooks.setdefault("request", []).append(_add_csrf)
+
+
+def make_api_client() -> httpx.Client:
+    client = httpx.Client(timeout=TIMEOUT, base_url=BASE)
+    install_csrf_hook(client)
+    return client
+
+
+def poll_document(client: httpx.Client, doc_id: int, headers: dict | None = None, timeout_sec: int = 120) -> dict:
     deadline = time.time() + timeout_sec
     last = None
+    hdrs = headers or {}
     while time.time() < deadline:
-        r = client.get(f"{BASE}/api/documents/{doc_id}/status", headers=headers)
+        r = client.get(f"{BASE}/api/documents/{doc_id}/status", headers=hdrs)
         r.raise_for_status()
         last = r.json()
         if last.get("status") in ("completed", "failed"):
@@ -52,6 +93,14 @@ def unique_user():
         "password": "TestPass123!",
         "username": f"e2e_{suffix}",
     }
+
+
+def register_user(client: httpx.Client, user: dict | None = None) -> dict:
+    """Register and return user payload; client receives auth cookies."""
+    payload = user or unique_user()
+    r = client.post(f"{BASE}/api/auth/register", json=payload)
+    r.raise_for_status()
+    return payload
 
 
 def make_chinese_txt(path: Path) -> None:
