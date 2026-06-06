@@ -21,7 +21,7 @@ from app.api.documents import router as documents_router
 from app.api.tasks import router as tasks_router
 from app.api.chat import router as chat_router
 from app.api.admin import router as admin_router
-from app.core.config import get_settings, validate_production_settings
+from app.core.config import get_settings, validate_production_settings, validate_embedding_runtime
 from app.core.health import readiness_report
 from app.core.metrics import metrics_payload, prometheus_http_middleware
 
@@ -32,6 +32,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
     validate_production_settings(settings)
+    validate_embedding_runtime(settings)
     yield
     await close_redis()
 

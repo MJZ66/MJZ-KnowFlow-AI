@@ -17,6 +17,21 @@ def _db_url() -> str:
     return url
 
 
+def _column_exists(cur, table: str, column: str) -> bool:
+    cur.execute(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = %s
+          AND column_name = %s
+        LIMIT 1
+        """,
+        (table, column),
+    )
+    return cur.fetchone() is not None
+
+
 def main() -> int:
     try:
         import psycopg2
@@ -46,6 +61,20 @@ def main() -> int:
     conn.close()
 
     if users_exists and not has_revision:
+        conn = psycopg2.connect(url)
+        cur = conn.cursor()
+        has_activity_cols = _column_exists(cur, "users", "last_login_at")
+        has_publish_cols = _column_exists(cur, "knowledge_bases", "publish_status")
+        conn.close()
+
+        if not has_activity_cols or not has_publish_cols:
+            print(
+                "Existing schema detected without alembic revision and missing newer columns "
+                "— running alembic upgrade head..."
+            )
+            subprocess.run(["alembic", "upgrade", "head"], check=True)
+            return 0
+
         print("Existing schema detected without alembic revision — stamping head...")
         subprocess.run(["alembic", "stamp", "head"], check=True)
 

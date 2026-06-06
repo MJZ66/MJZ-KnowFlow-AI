@@ -22,6 +22,19 @@ from app.models import (
     MemberRole,
 )
 from app.schemas.kb import KBCreate, KBUpdate, KBResponse, MemberAdd, MemberResponse, PaginatedKBList
+
+
+def _serialize_member(member: KnowledgeBaseMember, user: User | None = None) -> MemberResponse:
+    role = member.role.value if hasattr(member.role, "value") else str(member.role)
+    return MemberResponse(
+        id=member.id,
+        knowledge_base_id=member.knowledge_base_id,
+        user_id=member.user_id,
+        role=role,
+        username=user.username if user else None,
+        email=user.email if user else None,
+        created_at=member.created_at,
+    )
 from app.core.config import get_settings
 from app.services.kb_publish import is_staff, kb_to_public_dict, request_publish
 
@@ -240,15 +253,30 @@ async def add_member(
 ):
     kb = await require_kb_access(db, kb_id, current_user, KBAccessLevel.OWNER)
 
-    user_result = await db.execute(select(User).where(User.id == req.user_id))
-    target_user = user_result.scalar_one_or_none()
+    if req.role == MemberRole.OWNER.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot assign owner role via invite.")
+
+    target_user: User | None = None
+    if req.user_id is not None:
+        user_result = await db.execute(select(User).where(User.id == req.user_id))
+        target_user = user_result.scalar_one_or_none()
+    elif req.email:
+        email = req.email.strip().lower()
+        user_result = await db.execute(select(User).where(func.lower(User.email) == email))
+        target_user = user_result.scalar_one_or_none()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide user_id or email.",
+        )
+
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
     existing = await db.execute(
         select(KnowledgeBaseMember).where(
             KnowledgeBaseMember.knowledge_base_id == kb_id,
-            KnowledgeBaseMember.user_id == req.user_id,
+            KnowledgeBaseMember.user_id == target_user.id,
         )
     )
     if existing.scalar_one_or_none():
@@ -256,12 +284,12 @@ async def add_member(
 
     member = KnowledgeBaseMember(
         knowledge_base_id=kb_id,
-        user_id=req.user_id,
+        user_id=target_user.id,
         role=MemberRole(req.role),
     )
     db.add(member)
     await db.flush()
-    return member
+    return _serialize_member(member, target_user)
 
 
 @router.get("/{kb_id}/members", response_model=list[MemberResponse])
@@ -273,11 +301,13 @@ async def list_members(
     await require_kb_access(db, kb_id, current_user, KBAccessLevel.VIEWER)
 
     result = await db.execute(
-        select(KnowledgeBaseMember).where(
-            KnowledgeBaseMember.knowledge_base_id == kb_id
-        )
+        select(KnowledgeBaseMember, User)
+        .join(User, User.id == KnowledgeBaseMember.user_id)
+        .where(KnowledgeBaseMember.knowledge_base_id == kb_id)
+        .order_by(KnowledgeBaseMember.created_at.asc())
     )
-    return result.scalars().all()
+    rows = result.all()
+    return [_serialize_member(member, user) for member, user in rows]
 
 
 @router.delete("/{kb_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)

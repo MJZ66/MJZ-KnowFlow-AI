@@ -37,6 +37,9 @@ chromadb==0.5.23
 openai==1.58.1
 tiktoken==0.8.0
 
+# Optional BGE embeddings — install via: pip install -r requirements-bge.txt
+# See .env.production.example and Dockerfile INSTALL_BGE build arg.
+
 # Utilities
 tenacity==9.0.0
 

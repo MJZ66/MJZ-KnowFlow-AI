@@ -9,46 +9,87 @@ interface FileUploaderProps {
   kbId: number;
   onUploaded: (doc: Document) => void;
   disabled?: boolean;
+  multiple?: boolean;
 }
 
 const ALLOWED_TYPES = ['.pdf', '.docx', '.md', '.txt'];
 
-export default function FileUploader({ kbId, onUploaded, disabled }: FileUploaderProps) {
+function isAllowedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return ALLOWED_TYPES.some((ext) => name.endsWith(ext));
+}
+
+export default function FileUploader({ kbId, onUploaded, disabled, multiple = true }: FileUploaderProps) {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
+  const [currentFile, setCurrentFile] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [batchIndex, setBatchIndex] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
 
-  const handleUpload = useCallback(async (file: File) => {
+  const uploadFiles = useCallback(async (files: File[]) => {
+    const valid = files.filter(isAllowedFile);
+    if (valid.length === 0) {
+      setError(t('document.invalidType'));
+      return;
+    }
+
     setError(null);
     setUploading(true);
-    setUploadProgress(0);
-    setSelectedFile(file);
-    try {
-      const doc = await uploadFileWithProgress<Document>(
-        `/api/kbs/${kbId}/documents/upload`,
-        file,
-        setUploadProgress,
-      );
-      onUploaded(doc);
-      setSelectedFile(null);
+    setBatchTotal(valid.length);
+    setBatchIndex(0);
+
+    const errors: string[] = [];
+
+    for (let i = 0; i < valid.length; i++) {
+      const file = valid[i];
+      setBatchIndex(i + 1);
+      setCurrentFile(file.name);
       setUploadProgress(0);
-    } catch (err: unknown) {
-      setError(parseApiError(err));
-    } finally {
-      setUploading(false);
+      try {
+        const doc = await uploadFileWithProgress<Document>(
+          `/api/kbs/${kbId}/documents/upload`,
+          file,
+          setUploadProgress,
+        );
+        onUploaded(doc);
+      } catch (err: unknown) {
+        errors.push(`${file.name}: ${parseApiError(err)}`);
+      }
     }
-  }, [kbId, onUploaded]);
+
+    setCurrentFile(null);
+    setUploadProgress(0);
+    setBatchIndex(0);
+    setBatchTotal(0);
+    setUploading(false);
+
+    if (errors.length > 0) {
+      setError(errors.join('\n'));
+    }
+  }, [kbId, onUploaded, t]);
 
   const onDrop = useCallback((e: DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleUpload(file);
-  }, [handleUpload]);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) void uploadFiles(files);
+  }, [uploadFiles]);
+
+  const openPicker = () => {
+    if (disabled || uploading) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = ALLOWED_TYPES.join(',');
+    input.multiple = multiple;
+    input.onchange = (e: Event) => {
+      const list = (e.target as HTMLInputElement).files;
+      if (list?.length) void uploadFiles(Array.from(list));
+    };
+    input.click();
+  };
 
   return (
     <div className="space-y-3">
@@ -64,23 +105,19 @@ export default function FileUploader({ kbId, onUploaded, disabled }: FileUploade
             ? 'border-brand-500 bg-brand-500/10 scale-[1.01] shadow-glow'
             : 'border-surface-700 hover:border-brand-600/40 bg-surface-900/40'
         } ${disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
-        onClick={() => {
-          if (disabled) return;
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = ALLOWED_TYPES.join(',');
-          input.onchange = (e) => {
-            const f = (e.target as HTMLInputElement).files?.[0];
-            if (f) handleUpload(f);
-          };
-          input.click();
-        }}
+        onClick={openPicker}
+        data-testid="file-uploader"
       >
         {uploading ? (
           <div className="space-y-3">
             <div className="w-10 h-10 mx-auto rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
             <p className="text-surface-200 font-medium">{t('document.uploading')}</p>
-            {selectedFile && <p className="text-surface-500 text-sm truncate max-w-xs mx-auto">{selectedFile.name}</p>}
+            {batchTotal > 1 && (
+              <p className="text-surface-500 text-xs">
+                {t('document.uploadBatch', { current: batchIndex, total: batchTotal })}
+              </p>
+            )}
+            {currentFile && <p className="text-surface-500 text-sm truncate max-w-xs mx-auto">{currentFile}</p>}
             <div className="max-w-xs mx-auto">
               <div className="h-1.5 bg-surface-800 rounded-full overflow-hidden">
                 <div
@@ -97,13 +134,15 @@ export default function FileUploader({ kbId, onUploaded, disabled }: FileUploade
               <Upload className="w-6 h-6 text-brand-400" />
             </div>
             <p className="text-surface-200 font-medium text-sm">{t('document.uploadHint')}</p>
-            <p className="text-surface-500 text-xs">{t('document.uploadTypes')}</p>
+            <p className="text-surface-500 text-xs">
+              {multiple ? t('document.uploadHintMultiple') : t('document.uploadTypes')}
+            </p>
           </div>
         )}
       </div>
       {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/5 border border-red-500/20 rounded-lg p-3">
-          <X className="w-4 h-4 shrink-0" />
+        <div className="flex items-start gap-2 text-red-400 text-sm bg-red-500/5 border border-red-500/20 rounded-lg p-3 whitespace-pre-wrap">
+          <X className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}

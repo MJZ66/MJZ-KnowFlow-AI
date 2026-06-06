@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # ============================================
     VECTOR_PROVIDER: Literal["deepseek", "chroma", "chroma_hash"] = "chroma_hash"
     EMBEDDING_PROVIDER: Literal["hash", "local_bge", "dashscope", "openai_compatible"] = "hash"
-    EMBEDDING_MODEL: str = "bge-m3"
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
     EMBEDDING_DIM: int = 384
     EMBEDDING_DEVICE: str = "cpu"
     EMBEDDING_API_BASE: str = ""
@@ -179,10 +179,12 @@ DEFAULT_SECRET_KEY = "change-me-to-a-random-secret-key-at-least-32-chars"
 
 
 def validate_production_settings(settings: Settings | None = None) -> None:
-    """Fail fast when production uses an insecure SECRET_KEY."""
+    """Fail fast when production uses insecure defaults."""
     import logging
 
     s = settings or get_settings()
+    log = logging.getLogger(__name__)
+
     insecure = (
         not s.SECRET_KEY
         or s.SECRET_KEY == DEFAULT_SECRET_KEY
@@ -191,9 +193,44 @@ def validate_production_settings(settings: Settings | None = None) -> None:
     if s.APP_ENV == "production" and insecure:
         raise RuntimeError("SECRET_KEY is insecure for production.")
     if s.APP_ENV != "production" and insecure:
-        logging.getLogger(__name__).warning(
-            "SECRET_KEY is using the default value — acceptable in development only."
+        log.warning("SECRET_KEY is using the default value — acceptable in development only.")
+
+    if s.APP_ENV == "production" and s.EMBEDDING_PROVIDER == "hash":
+        log.warning(
+            "EMBEDDING_PROVIDER=hash in production — retrieval quality is limited. "
+            "Set EMBEDDING_PROVIDER=local_bge, VECTOR_PROVIDER=chroma, EMBEDDING_DIM=1024."
         )
+
+    if s.APP_ENV == "production" and s.EMBEDDING_PROVIDER == "local_bge":
+        if s.VECTOR_PROVIDER == "chroma_hash":
+            raise RuntimeError(
+                "Production local_bge requires VECTOR_PROVIDER=chroma (not chroma_hash)."
+            )
+        if s.EMBEDDING_DIM != 1024:
+            log.warning(
+                "BAAI/bge-m3 uses 1024 dimensions; EMBEDDING_DIM=%s may cause mismatch.",
+                s.EMBEDDING_DIM,
+            )
+
+
+def validate_embedding_runtime(settings: Settings | None = None) -> None:
+    """Ensure configured embedding provider is actually available at startup."""
+    from app.services.embedding_service import EmbeddingServiceFactory
+
+    s = settings or get_settings()
+    if s.EMBEDDING_PROVIDER != "local_bge":
+        return
+
+    svc = EmbeddingServiceFactory.get_service()
+    if svc.provider_name != "local_bge":
+        msg = (
+            f"EMBEDDING_PROVIDER=local_bge but runtime provider is {svc.provider_name}. "
+            "Install sentence-transformers and ensure the model can load."
+        )
+        if s.APP_ENV == "production":
+            raise RuntimeError(msg)
+        import logging
+        logging.getLogger(__name__).warning(msg)
 
 @lru_cache()
 def get_settings() -> Settings:

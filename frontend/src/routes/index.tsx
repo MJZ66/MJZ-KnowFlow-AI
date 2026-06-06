@@ -1,13 +1,17 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import PageTransitionOutlet from '../components/PageTransitionOutlet';
 import { useUserStore } from '../stores/userStore';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import DashboardPage from '../pages/DashboardPage';
 import KBDetailPage from '../pages/KBDetailPage';
-import ChatPage from '../pages/ChatPage';
 import AdminPage from '../pages/AdminPage';
 import AccountPage from '../pages/AccountPage';
+
+function ChatRedirect() {
+  const { kbId } = useParams<{ kbId: string }>();
+  return <Navigate to={`/kbs/${kbId}`} replace />;
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
@@ -61,7 +65,7 @@ export const router = createBrowserRouter([
         path: '/kbs/:kbId/chat',
         element: (
           <RequireAuth>
-            <ChatPage />
+            <ChatRedirect />
           </RequireAuth>
         ),
       },

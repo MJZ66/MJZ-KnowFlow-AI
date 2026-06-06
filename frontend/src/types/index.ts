@@ -51,6 +51,8 @@ export interface KBMember {
   knowledge_base_id: number;
   user_id: number;
   role: 'owner' | 'editor' | 'viewer';
+  username?: string | null;
+  email?: string | null;
   created_at: string;
 }
 

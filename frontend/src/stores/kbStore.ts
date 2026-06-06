@@ -44,6 +44,7 @@ interface KBState {
   deleteKB: (id: number) => Promise<void>;
   fetchMembers: (kbId: number) => Promise<void>;
   addMember: (kbId: number, userId: number, role: string) => Promise<void>;
+  addMemberByEmail: (kbId: number, email: string, role: string) => Promise<void>;
   removeMember: (kbId: number, userId: number) => Promise<void>;
   setCurrentKB: (kb: KnowledgeBase | null) => void;
   reset: () => void;
@@ -140,6 +141,14 @@ export const useKBStore = create<KBState>((set, get) => ({
     await api(`/api/kbs/${kbId}/members`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId, role }),
+    });
+    await get().fetchMembers(kbId);
+  },
+
+  addMemberByEmail: async (kbId, email, role) => {
+    await api(`/api/kbs/${kbId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
     });
     await get().fetchMembers(kbId);
   },

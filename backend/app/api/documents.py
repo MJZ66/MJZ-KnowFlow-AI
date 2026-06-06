@@ -130,20 +130,31 @@ async def list_documents(
     kb_id: int,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=200),
+    status_filter: str | None = Query(default=None, alias="status"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List documents in a knowledge base with pagination."""
+    """List documents in a knowledge base with pagination and optional search."""
     await require_kb_access(db, kb_id, current_user, KBAccessLevel.VIEWER)
 
+    filters = [Document.knowledge_base_id == kb_id]
+    if q and q.strip():
+        filters.append(Document.original_filename.ilike(f"%{q.strip()}%"))
+    if status_filter and status_filter.strip():
+        try:
+            filters.append(Document.status == DocumentStatus(status_filter.strip()))
+        except ValueError:
+            pass
+
     total_result = await db.execute(
-        select(func.count()).select_from(Document).where(Document.knowledge_base_id == kb_id)
+        select(func.count()).select_from(Document).where(*filters)
     )
     total = total_result.scalar() or 0
 
     result = await db.execute(
         select(Document)
-        .where(Document.knowledge_base_id == kb_id)
+        .where(*filters)
         .order_by(Document.created_at.desc())
         .offset(skip)
         .limit(limit)

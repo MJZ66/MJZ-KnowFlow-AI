@@ -23,6 +23,11 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    """Persist Python enum values (lowercase) for PostgreSQL native enums."""
+    return [member.value for member in enum_cls]
+
+
 def _utcnow() -> datetime:
     """Return current UTC datetime."""
     return datetime.now(timezone.utc)
@@ -90,7 +95,11 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     username = Column(String(100), nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
+    role = Column(
+        Enum(UserRole, name="userrole", values_callable=_enum_values),
+        default=UserRole.USER,
+        nullable=False,
+    )
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
@@ -119,8 +128,16 @@ class KnowledgeBase(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(200), nullable=False)
     description = Column(Text, default="")
-    visibility = Column(Enum(Visibility), default=Visibility.PRIVATE, nullable=False)
-    publish_status = Column(Enum(PublishStatus), default=PublishStatus.NONE, nullable=False)
+    visibility = Column(
+        Enum(Visibility, name="visibility", values_callable=_enum_values),
+        default=Visibility.PRIVATE,
+        nullable=False,
+    )
+    publish_status = Column(
+        Enum(PublishStatus, name="publishstatus", values_callable=_enum_values),
+        default=PublishStatus.NONE,
+        nullable=False,
+    )
     publish_requested_at = Column(DateTime(timezone=True), nullable=True)
     publish_reviewed_at = Column(DateTime(timezone=True), nullable=True)
     publish_review_note = Column(Text, nullable=True)
@@ -149,7 +166,11 @@ class KnowledgeBaseMember(Base):
         Integer, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role = Column(Enum(MemberRole), default=MemberRole.VIEWER, nullable=False)
+    role = Column(
+        Enum(MemberRole, name="memberrole", values_callable=_enum_values),
+        default=MemberRole.VIEWER,
+        nullable=False,
+    )
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relationships
@@ -174,7 +195,11 @@ class Document(Base):
     file_path = Column(String(1000), nullable=False)
     file_type = Column(String(20), nullable=False)
     file_size = Column(Integer, nullable=False)  # bytes
-    status = Column(Enum(DocumentStatus), default=DocumentStatus.UPLOADED, nullable=False)
+    status = Column(
+        Enum(DocumentStatus, name="documentstatus", values_callable=_enum_values),
+        default=DocumentStatus.UPLOADED,
+        nullable=False,
+    )
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
@@ -250,7 +275,10 @@ class ChatMessage(Base):
         Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role = Column(Enum(MessageRole), nullable=False)
+    role = Column(
+        Enum(MessageRole, name="messagerole", values_callable=_enum_values),
+        nullable=False,
+    )
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
@@ -293,7 +321,11 @@ class BackgroundTask(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_type = Column(String(100), nullable=False)
-    status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
+    status = Column(
+        Enum(TaskStatus, name="taskstatus", values_callable=_enum_values),
+        default=TaskStatus.PENDING,
+        nullable=False,
+    )
     related_document_id = Column(Integer, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     progress = Column(Integer, default=0)  # 0-100

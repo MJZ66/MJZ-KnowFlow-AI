@@ -58,7 +58,8 @@ class KBPublishRequestItem(BaseModel):
 
 
 class MemberAdd(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None
+    email: Optional[str] = Field(default=None, max_length=255)
     role: str = Field(default="viewer")
 
 
@@ -67,6 +68,8 @@ class MemberResponse(BaseModel):
     knowledge_base_id: int
     user_id: int
     role: str
+    username: Optional[str] = None
+    email: Optional[str] = None
     created_at: datetime
 
     model_config = dict(from_attributes=True)

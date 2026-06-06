@@ -51,6 +51,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_BGE: ${INSTALL_BGE:-false}
     container_name: knowflow-backend
     restart: unless-stopped
     depends_on:
@@ -78,9 +80,10 @@ services:
       - LLM_MODEL=${LLM_MODEL:-qwen-plus}
       - VECTOR_PROVIDER=${VECTOR_PROVIDER:-chroma_hash}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-hash}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-bge-m3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
       - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
       - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - HF_HOME=${HF_HOME:-/app/.cache/huggingface}
       - RERANKER_ENABLED=${RERANKER_ENABLED:-false}
       - RERANKER_PROVIDER=${RERANKER_PROVIDER:-none}
       - RERANKER_TOP_N=${RERANKER_TOP_N:-5}
@@ -111,6 +114,7 @@ services:
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-30}
     volumes:
       - uploads_data:/app/uploads
+      - huggingface_cache:/app/.cache/huggingface
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -132,6 +136,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_BGE: ${INSTALL_BGE:-false}
     container_name: knowflow-celery-worker
     restart: unless-stopped
     depends_on:
@@ -157,9 +163,10 @@ services:
       - LLM_MODEL=${LLM_MODEL:-qwen-plus}
       - VECTOR_PROVIDER=${VECTOR_PROVIDER:-chroma_hash}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-hash}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-bge-m3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
       - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
       - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - HF_HOME=${HF_HOME:-/app/.cache/huggingface}
       - RERANKER_ENABLED=${RERANKER_ENABLED:-false}
       - HYBRID_SEARCH_ENABLED=${HYBRID_SEARCH_ENABLED:-false}
       - APP_ENV=${APP_ENV:-development}
@@ -169,6 +176,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
     volumes:
       - uploads_data:/app/uploads
+      - huggingface_cache:/app/.cache/huggingface
     command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
     deploy:
       resources:
@@ -213,3 +221,5 @@ volumes:
     name: knowflow_chroma_data
   uploads_data:
     name: knowflow_uploads_data
+  huggingface_cache:
+    name: knowflow_huggingface_cache

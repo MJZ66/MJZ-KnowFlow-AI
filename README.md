@@ -7,10 +7,10 @@
 | 验收项 | 基线 |
 |--------|------|
 | `python scripts/e2e_acceptance.py` | 13/13 |
-| `pytest tests/` | 37 passed, 4 skipped |
+| `pytest tests/` | 55 passed, 2 skipped |
 | `npm run build` | pass |
-| `npm run test:run` | 12 passed |
-| `npm run e2e` | 2 passed（自动拉起 dev server） |
+| `npm run test:run` | 19 passed |
+| `npm run e2e` | 4 passed（desktop 2 + mobile 2；需 backend + `npx playwright install chromium`） |
 
 完整部署与开发说明见 **[docs/zh/README.md](docs/zh/README.md)**（分章索引）；**最短部署**见 [docs/zh/16-最短部署清单.md](docs/zh/16-最短部署清单.md)；K8s 见 **[deploy/README.md](deploy/README.md)**。
 
@@ -44,6 +44,7 @@ copy .env.example .env
 docker compose up --build -d
 # 或一键部署+验收: .\deploy_all.ps1
 # 或仅后端: docker compose up --build -d backend celery-worker
+# backend 与 celery-worker 共用镜像，改后端代码后须一起重建
 ```
 
 | 服务 | 地址 |

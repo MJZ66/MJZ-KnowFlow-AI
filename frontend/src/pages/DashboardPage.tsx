@@ -6,6 +6,7 @@ import { useUserStore } from '../stores/userStore';
 import UserNavActions from '../components/UserNavActions';
 import { useKBStore } from '../stores/kbStore';
 import KnowledgeBaseCard from '../components/KnowledgeBaseCard';
+import OnboardingBanner from '../components/OnboardingBanner';
 import AppShell from '../components/AppShell';
 import TabPanel from '../components/TabPanel';
 
@@ -68,6 +69,8 @@ export default function DashboardPage() {
       userLabel={user?.username}
       actions={<UserNavActions />}
     >
+      <OnboardingBanner />
+
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 animate-fade-up">
         <div>
           <p className="section-label mb-2">{t('kb.myList')}</p>

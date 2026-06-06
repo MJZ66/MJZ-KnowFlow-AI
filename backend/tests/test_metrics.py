@@ -27,15 +27,16 @@ def test_metrics_endpoint_returns_prometheus_text(metrics_client: httpx.Client):
 
 def test_metrics_disabled_returns_404(monkeypatch):
     from app.core.config import Settings
+    import main
 
     class Disabled(Settings):
         METRICS_ENABLED: bool = False
 
-    monkeypatch.setattr("app.core.config.get_settings", lambda: Disabled())
-    from main import app
+    monkeypatch.setattr(main, "settings", Disabled())
+
     from fastapi.testclient import TestClient
 
-    with TestClient(app) as client:
+    with TestClient(main.app) as client:
         r = client.get("/api/metrics")
         assert r.status_code == 404
 

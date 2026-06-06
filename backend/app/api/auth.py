@@ -9,7 +9,8 @@ Authentication API routes:
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -49,8 +50,8 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         )
 
     # Count existing users to determine if this is the first (super_admin)
-    count_result = await db.execute(select(User))
-    is_first_user = len(count_result.scalars().all()) == 0
+    count_result = await db.execute(select(func.count()).select_from(User))
+    is_first_user = (count_result.scalar_one() or 0) == 0
 
     user = User(
         email=req.email,
@@ -58,8 +59,14 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         username=req.username,
         role=UserRole.SUPER_ADMIN if is_first_user else UserRole.USER,
     )
-    db.add(user)
-    await db.flush()
+    try:
+        db.add(user)
+        await db.flush()
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered.",
+        )
     record_login(user)
 
     access_token = create_access_token(subject=user.id)

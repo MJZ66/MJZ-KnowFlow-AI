@@ -110,7 +110,7 @@ class HashEmbeddingService(BaseEmbeddingService):
 
 
 class LocalBGEEmbeddingService(BaseEmbeddingService):
-    """Local BGE model — optional; falls back to hash if unavailable."""
+    """Local BGE model — optional in dev; required when production sets local_bge."""
 
     def __init__(self):
         settings = get_settings()
@@ -121,6 +121,10 @@ class LocalBGEEmbeddingService(BaseEmbeddingService):
         self._model = None
         self._available = False
         self._try_load()
+
+    @property
+    def is_available(self) -> bool:
+        return self._available
 
     def _try_load(self) -> None:
         try:
