@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from tests.conftest import requires_llm
 from tests.e2e_helpers import (
     BASE,
     TIMEOUT,
@@ -165,6 +166,7 @@ def test_empty_upload_failed(api_client: httpx.Client, auth_ctx, tmp_path: Path)
     assert status["status"] == "failed"
 
 
+@requires_llm
 def test_rag_sse_stream(api_client: httpx.Client, auth_ctx, tmp_path: Path):
     kb = api_client.post("/api/kbs", headers=auth_ctx["headers"], json={
         "name": "RAG Test KB",

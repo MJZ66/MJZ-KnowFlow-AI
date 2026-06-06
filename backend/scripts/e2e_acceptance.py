@@ -173,6 +173,12 @@ def main() -> int:
                 fail("Upload empty TXT → FAILED", str(status))
 
         # --- Chat session + RAG SSE stream ---
+        setup_r = client.get(f"{BASE}/api/setup/status", headers=headers)
+        llm_ready = (
+            setup_r.status_code == 200
+            and setup_r.json().get("ready_for_chat") is True
+        )
+
         r = client.post(
             f"{BASE}/api/kbs/{kb_id}/chat/sessions",
             headers=headers,
@@ -184,60 +190,63 @@ def main() -> int:
             session_id = r.json()["id"]
             ok("Create chat session", f"session_id={session_id}")
 
-            with client.stream(
-                "POST",
-                f"{BASE}/api/chat/sessions/{session_id}/stream",
-                headers=headers,
-                json={"content": "KnowFlow AI 支持哪些文件格式？", "top_k": 5},
-            ) as stream:
-                chunks = []
-                for chunk in stream.iter_text():
-                    chunks.append(chunk)
-                sse_text = "".join(chunks)
-
-            events = parse_sse_stream(sse_text)
-            event_types = [e[0] for e in events]
-            tokens = [d.get("content", "") for t, d in events if t == "token"]
-            refs = next((d for t, d in events if t == "references"), None)
-
-            has_retrieval = "retrieval_start" in event_types and "retrieval_done" in event_types
-            has_tokens = len(tokens) > 0 and any(tokens)
-            has_done = "done" in event_types
-
-            if has_retrieval:
-                ok("RAG SSE retrieval events")
+            if not llm_ready:
+                ok("RAG SSE (skipped)", "LLM_API_KEY not configured — set GitHub secret LLM_API_KEY for full RAG CI")
             else:
-                fail("RAG SSE retrieval events", str(event_types))
+                with client.stream(
+                    "POST",
+                    f"{BASE}/api/chat/sessions/{session_id}/stream",
+                    headers=headers,
+                    json={"content": "KnowFlow AI 支持哪些文件格式？", "top_k": 5},
+                ) as stream:
+                    chunks = []
+                    for chunk in stream.iter_text():
+                        chunks.append(chunk)
+                    sse_text = "".join(chunks)
 
-            if has_tokens:
-                ok("RAG SSE token streaming", f"tokens={len(''.join(tokens))} chars")
-            else:
-                fail("RAG SSE token streaming", sse_text[:300])
+                events = parse_sse_stream(sse_text)
+                event_types = [e[0] for e in events]
+                tokens = [d.get("content", "") for t, d in events if t == "token"]
+                refs = next((d for t, d in events if t == "references"), None)
 
-            if has_done:
-                ok("RAG SSE done event")
-            else:
-                fail("RAG SSE done event")
+                has_retrieval = "retrieval_start" in event_types and "retrieval_done" in event_types
+                has_tokens = len(tokens) > 0 and any(tokens)
+                has_done = "done" in event_types
 
-            # Reference noise filter — CLI lines should not dominate references
-            if refs and isinstance(refs, list) and len(refs) > 0:
-                noise_in_refs = sum(
-                    1 for ref in refs
-                    if ref.get("section_title") and (
-                        str(ref.get("section_title", "")).startswith("cd ")
-                        or "docker compose" in str(ref.get("section_title", "")).lower()
-                    )
-                )
-                previews = " ".join(str(ref.get("content_preview", "")) for ref in refs)
-                has_meaningful = any(k in previews for k in ("知识库", "PDF", "问答", "KnowFlow"))
-                if noise_in_refs == 0 and has_meaningful:
-                    ok("Reference noise filter", f"refs={len(refs)}")
-                elif has_meaningful:
-                    ok("Reference noise filter (partial)", f"refs={len(refs)}, noise_titles={noise_in_refs}")
+                if has_retrieval:
+                    ok("RAG SSE retrieval events")
                 else:
-                    fail("Reference noise filter", f"refs={len(refs)}, preview={previews[:120]}")
-            else:
-                fail("Reference noise filter", "no references returned")
+                    fail("RAG SSE retrieval events", str(event_types))
+
+                if has_tokens:
+                    ok("RAG SSE token streaming", f"tokens={len(''.join(tokens))} chars")
+                else:
+                    fail("RAG SSE token streaming", sse_text[:300])
+
+                if has_done:
+                    ok("RAG SSE done event")
+                else:
+                    fail("RAG SSE done event")
+
+                # Reference noise filter — CLI lines should not dominate references
+                if refs and isinstance(refs, list) and len(refs) > 0:
+                    noise_in_refs = sum(
+                        1 for ref in refs
+                        if ref.get("section_title") and (
+                            str(ref.get("section_title", "")).startswith("cd ")
+                            or "docker compose" in str(ref.get("section_title", "")).lower()
+                        )
+                    )
+                    previews = " ".join(str(ref.get("content_preview", "")) for ref in refs)
+                    has_meaningful = any(k in previews for k in ("知识库", "PDF", "问答", "KnowFlow"))
+                    if noise_in_refs == 0 and has_meaningful:
+                        ok("Reference noise filter", f"refs={len(refs)}")
+                    elif has_meaningful:
+                        ok("Reference noise filter (partial)", f"refs={len(refs)}, noise_titles={noise_in_refs}")
+                    else:
+                        fail("Reference noise filter", f"refs={len(refs)}, preview={previews[:120]}")
+                else:
+                    fail("Reference noise filter", "no references returned")
 
         # --- i18n files validation (frontend) ---
         frontend_root = Path(__file__).resolve().parents[2] / "frontend" / "src" / "i18n" / "locales"
