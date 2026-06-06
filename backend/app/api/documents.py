@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +31,7 @@ from app.schemas.document import (
     PaginatedDocumentList,
 )
 from app.services.file_validation import validate_upload_file
+from app.services.file_types import content_type_for, preview_kind
 from app.services.cache_invalidation import invalidate_kb_rag_cache
 from app.services.vector_service import VectorServiceFactory
 
@@ -287,14 +289,30 @@ async def list_document_chunks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List document chunks for preview (COMPLETED documents only)."""
+    """List document chunks for preview. Returns status/progress while processing."""
     doc = await _get_document_with_access(db, document_id, current_user)
 
     status_val = doc.status.value if hasattr(doc.status, "value") else str(doc.status)
+
+    task_result = await db.execute(
+        select(BackgroundTask)
+        .where(BackgroundTask.related_document_id == document_id)
+        .order_by(BackgroundTask.created_at.desc())
+        .limit(1)
+    )
+    task = task_result.scalar_one_or_none()
+    progress = task.progress if task else 0
+
     if status_val != DocumentStatus.COMPLETED.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Document is not ready for preview.",
+        return DocumentChunksResponse(
+            document_id=doc.id,
+            filename=doc.original_filename,
+            file_type=doc.file_type,
+            preview_kind=preview_kind(doc.file_type),
+            status=status_val,
+            progress=progress,
+            error_message=doc.error_message,
+            chunks=[],
         )
 
     result = await db.execute(
@@ -307,8 +325,34 @@ async def list_document_chunks(
     return DocumentChunksResponse(
         document_id=doc.id,
         filename=doc.original_filename,
+        file_type=doc.file_type,
+        preview_kind=preview_kind(doc.file_type),
         status=status_val,
+        progress=100,
+        error_message=doc.error_message,
         chunks=[_chunk_to_preview(c) for c in chunks],
+    )
+
+
+@router.get("/api/documents/{document_id}/file")
+async def get_document_file(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download original uploaded file for inline preview (PDF, images)."""
+    doc = await _get_document_with_access(db, document_id, current_user)
+
+    file_path = Path(doc.file_path)
+    if not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk.")
+
+    media_type = content_type_for(doc.file_type)
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=doc.original_filename,
+        headers={"Content-Disposition": f'inline; filename="{doc.original_filename}"'},
     )
 
 

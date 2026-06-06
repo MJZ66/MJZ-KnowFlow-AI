@@ -101,8 +101,11 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 30
     MAX_UPLOAD_SIZE_MB: int = 30
-    ALLOWED_FILE_TYPES: list[str] = ["pdf", "docx", "md", "txt"]
-    ALLOWED_FILE_EXTENSIONS: str = "pdf,docx,md,txt"
+    ALLOWED_FILE_TYPES: list[str] = [
+        "pdf", "docx", "md", "txt", "xlsx", "xls",
+        "png", "jpg", "jpeg", "webp", "gif", "bmp",
+    ]
+    ALLOWED_FILE_EXTENSIONS: str = "pdf,docx,md,txt,xlsx,xls,png,jpg,jpeg,webp,gif,bmp"
     MAX_FILENAME_LENGTH: int = 150
 
     # ============================================
@@ -131,6 +134,12 @@ class Settings(BaseSettings):
     # ============================================
     CELERY_WORKER_CONCURRENCY: int = 4
     CELERY_TASK_TIME_LIMIT: int = 600
+
+    # ============================================
+    # OCR (image documents)
+    # ============================================
+    OCR_ENABLED: bool = True
+    OCR_LANGUAGES: str = "chi_sim+eng"
 
     # ============================================
     # Observability

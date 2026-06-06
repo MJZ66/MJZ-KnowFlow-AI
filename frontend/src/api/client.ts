@@ -145,6 +145,30 @@ export async function uploadFile<T = unknown>(
   return res.json();
 }
 
+export async function fetchDocumentBlob(path: string): Promise<Blob> {
+  const { access } = getTokens();
+  const headers: Record<string, string> = {};
+  if (access) {
+    headers.Authorization = `Bearer ${access}`;
+  }
+
+  let res = await fetch(`${API_BASE}${path}`, { headers });
+
+  if (res.status === 401 && access) {
+    const newAccess = await refreshAccessToken();
+    if (newAccess) {
+      headers.Authorization = `Bearer ${newAccess}`;
+      res = await fetch(`${API_BASE}${path}`, { headers });
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error('Failed to load file');
+  }
+
+  return res.blob();
+}
+
 export function uploadFileWithProgress<T = unknown>(
   path: string,
   file: File,

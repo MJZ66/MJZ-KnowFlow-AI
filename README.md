@@ -1,13 +1,13 @@
 # KnowFlow AI — 私有 AI 知识库问答平台
 
-面向个人与小型团队的 RAG 知识库：上传 PDF / DOCX / MD / TXT，自动解析、切片、向量化，基于知识库进行带来源引用的流式问答。
+面向个人与小型团队的 RAG 知识库：上传 PDF、Word(DOCX)、Excel(XLS/XLSX)、Markdown、TXT、图片，自动解析、切片、向量化，基于知识库进行带来源引用的流式问答。
 
 **当前状态：生产可演示 / 准生产 Beta**
 
 | 验收项 | 基线 |
 |--------|------|
 | `python scripts/e2e_acceptance.py` | 13/13 |
-| `pytest tests/` | 55 passed, 2 skipped |
+| `pytest tests/` | 63 passed, 2 skipped |
 | `npm run build` | pass |
 | `npm run test:run` | 19 passed |
 | `npm run e2e` | 4 passed（desktop 2 + mobile 2；需 backend + `npx playwright install chromium`） |
@@ -111,7 +111,7 @@ knowflow-ai/
 
 - **认证：** `/api/auth/register|login|refresh|me`
 - **知识库：** `/api/kbs`（分页 `{items,total,skip,limit}`）、成员 CRUD
-- **文档：** 上传、列表（分页）、状态、`/api/documents/{id}/chunks` 预览
+- **文档：** 上传、列表（分页）、状态、`/api/documents/{id}/chunks` 预览、`/api/documents/{id}/file` 原文件（PDF/图片）
 - **对话：** 会话、消息、`/api/chat/sessions/{id}/stream`（SSE）
 - **健康：** `/api/health`、`/live`、`/ready`
 - **监控：** `/api/metrics`

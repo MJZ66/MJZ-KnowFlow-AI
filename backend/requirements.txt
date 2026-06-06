@@ -27,6 +27,10 @@ aiofiles==24.1.0
 # Document Parsing
 PyMuPDF==1.25.1
 python-docx==1.1.2
+openpyxl==3.1.5
+xlrd==2.0.1
+Pillow==11.1.0
+pytesseract==0.3.13
 markdown==3.7
 markdown-it-py==3.0.0
 

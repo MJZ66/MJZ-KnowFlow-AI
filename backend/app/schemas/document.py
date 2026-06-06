@@ -48,5 +48,9 @@ class ChunkPreviewItem(BaseModel):
 class DocumentChunksResponse(BaseModel):
     document_id: int
     filename: str
+    file_type: str = ""
+    preview_kind: str = "text"
     status: str
+    progress: int = 0
+    error_message: Optional[str] = None
     chunks: list[ChunkPreviewItem]

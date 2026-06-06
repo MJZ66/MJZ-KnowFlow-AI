@@ -2,6 +2,7 @@ import { useCallback, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, FileText, X } from 'lucide-react';
 import { uploadFileWithProgress } from '../api/client';
+import { ALLOWED_FILE_EXTENSIONS, FILE_ACCEPT_ATTR, isAllowedUploadFile } from '../constants/fileTypes';
 import { parseApiError } from '../utils/error';
 import type { Document } from '../types';
 
@@ -10,13 +11,6 @@ interface FileUploaderProps {
   onUploaded: (doc: Document) => void;
   disabled?: boolean;
   multiple?: boolean;
-}
-
-const ALLOWED_TYPES = ['.pdf', '.docx', '.md', '.txt'];
-
-function isAllowedFile(file: File): boolean {
-  const name = file.name.toLowerCase();
-  return ALLOWED_TYPES.some((ext) => name.endsWith(ext));
 }
 
 export default function FileUploader({ kbId, onUploaded, disabled, multiple = true }: FileUploaderProps) {
@@ -30,7 +24,7 @@ export default function FileUploader({ kbId, onUploaded, disabled, multiple = tr
   const [batchTotal, setBatchTotal] = useState(0);
 
   const uploadFiles = useCallback(async (files: File[]) => {
-    const valid = files.filter(isAllowedFile);
+    const valid = files.filter(isAllowedUploadFile);
     if (valid.length === 0) {
       setError(t('document.invalidType'));
       return;
@@ -82,7 +76,7 @@ export default function FileUploader({ kbId, onUploaded, disabled, multiple = tr
     if (disabled || uploading) return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = ALLOWED_TYPES.join(',');
+    input.accept = FILE_ACCEPT_ATTR;
     input.multiple = multiple;
     input.onchange = (e: Event) => {
       const list = (e.target as HTMLInputElement).files;
@@ -147,7 +141,7 @@ export default function FileUploader({ kbId, onUploaded, disabled, multiple = tr
         </div>
       )}
       <div className="flex flex-wrap gap-2 text-xs text-surface-500">
-        {ALLOWED_TYPES.map((ext) => (
+        {ALLOWED_FILE_EXTENSIONS.map((ext) => (
           <span key={ext} className="flex items-center gap-1 px-2 py-1 bg-surface-800/80 border border-surface-700 rounded-md font-mono">
             <FileText className="w-3 h-3 text-brand-500/80" />
             {ext}

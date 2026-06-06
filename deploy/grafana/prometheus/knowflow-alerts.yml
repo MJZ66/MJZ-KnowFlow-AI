@@ -1,0 +1,83 @@
+groups:
+  - name: knowflow-alerts
+    rules:
+      - alert: KnowFlowBackendDown
+        expr: up{job="knowflow-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: knowflow
+        annotations:
+          summary: "KnowFlow backend is unreachable"
+          description: "Prometheus cannot scrape knowflow-backend for 2 minutes."
+
+      - alert: KnowFlowReadinessDegraded
+        expr: |
+          increase(http_requests_total{endpoint="/api/health/ready",status="503"}[5m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: knowflow
+        annotations:
+          summary: "KnowFlow readiness probe failing"
+          description: "Postgres, Redis, or ChromaDB may be unhealthy."
+
+      - alert: KnowFlowHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: knowflow
+        annotations:
+          summary: "HTTP 5xx rate above 5%"
+          description: "Check backend logs and dependency health."
+
+      - alert: KnowFlowDocumentProcessFailures
+        expr: increase(document_process_failed_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: knowflow
+        annotations:
+          summary: "Document processing failures detected"
+          description: "Review celery-worker logs and upload validation."
+
+      - alert: KnowFlowCeleryTaskFailures
+        expr: increase(celery_task_failed_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: knowflow
+        annotations:
+          summary: "Celery task failures detected"
+          description: "Document queue may be stuck or workers crashed."
+
+      - alert: KnowFlowHighLatencyP99
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+          > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: knowflow
+        annotations:
+          summary: "API P99 latency above 5s"
+          description: "Investigate slow RAG queries or DB contention."
+
+      - alert: KnowFlowRagCacheMissSpike
+        expr: |
+          rate(rag_cache_miss_total[5m])
+          /
+          (rate(rag_cache_hit_total[5m]) + rate(rag_cache_miss_total[5m]) + 0.001)
+          > 0.9
+        for: 15m
+        labels:
+          severity: info
+          service: knowflow
+        annotations:
+          summary: "RAG cache miss ratio above 90%"
+          description: "Consider tuning TTL or cache key strategy."

@@ -34,8 +34,8 @@
 
 ```text
 e2e_acceptance.py:  13/13
-pytest:             37 passed, 4 skipped
+pytest:             63 passed, 2 skipped
 npm run build:      pass
-npm run test:run:   12 passed
-npm run e2e:        2 passed
+npm run test:run:   19 passed
+npm run e2e:        4 passed
 ```

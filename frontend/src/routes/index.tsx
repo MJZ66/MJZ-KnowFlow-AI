@@ -7,6 +7,7 @@ import DashboardPage from '../pages/DashboardPage';
 import KBDetailPage from '../pages/KBDetailPage';
 import AdminPage from '../pages/AdminPage';
 import AccountPage from '../pages/AccountPage';
+import SetupPage from '../pages/SetupPage';
 
 function ChatRedirect() {
   const { kbId } = useParams<{ kbId: string }>();
@@ -74,6 +75,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <AdminPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: '/setup',
+        element: (
+          <RequireAuth>
+            <SetupPage />
           </RequireAuth>
         ),
       },

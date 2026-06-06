@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
@@ -16,6 +19,16 @@ Get-Process | Where-Object { $_.Name -eq "node" }
 `;
 
 export const NOISE_PATTERNS = [/cd\s/i, /docker\s+compose/i, /powershell/i, /get-process/i];
+
+/** Valid 1x1 PNG */
+export const MINI_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/** Minimal valid xlsx fixture */
+const _fixturesDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+export const MINI_XLSX = readFileSync(join(_fixturesDir, 'sample.xlsx'));
 
 export interface RegisteredUser {
   email: string;

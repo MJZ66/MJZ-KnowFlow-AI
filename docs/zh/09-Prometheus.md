@@ -60,6 +60,21 @@ static_configs:
 - 文档处理成功 / 失败数
 - Celery 任务成功 / 失败数
 
+## 告警规则模板
+
+仓库已提供 Prometheus 告警规则，可直接导入：
+
+```text
+deploy/grafana/prometheus/knowflow-alerts.yml
+deploy/grafana/README.md
+```
+
+本地监控栈：
+
+```powershell
+docker compose --profile monitoring up -d prometheus grafana
+```
+
 ## 日志配合
 
 容器 stdout 关键字（便于 Loki / ELK 过滤）：

@@ -81,6 +81,11 @@ class LLMService:
 
         logger.info(f"Streaming chat: model={self.model}, messages={len(messages)}")
 
+        if not (self.api_key or "").strip():
+            raise RuntimeError(
+                "LLM API key is not configured. Set LLM_API_KEY in .env and restart the backend."
+            )
+
         async with client.stream("POST", url, json=payload) as response:
             if response.status_code != 200:
                 error_text = await response.aread()

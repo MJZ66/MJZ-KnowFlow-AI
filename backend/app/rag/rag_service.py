@@ -13,7 +13,7 @@ import json
 import logging
 from typing import AsyncGenerator, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -98,6 +98,67 @@ def _dedupe_chunks(chunks: list[dict]) -> list[dict]:
         seen.add(key)
         unique.append(chunk)
     return unique
+
+
+async def _kb_doc_stats(db: AsyncSession, knowledge_base_id: int) -> dict[str, int]:
+    """Count documents by coarse processing state for user-facing RAG hints."""
+    result = await db.execute(
+        select(Document.status, func.count())
+        .where(Document.knowledge_base_id == knowledge_base_id)
+        .group_by(Document.status)
+    )
+    stats = {"pending": 0, "completed": 0, "failed": 0, "total": 0}
+    for status, count in result.all():
+        stats["total"] += count
+        val = status.value if hasattr(status, "value") else str(status)
+        if val == DocumentStatus.COMPLETED.value:
+            stats["completed"] += count
+        elif val == DocumentStatus.FAILED.value:
+            stats["failed"] += count
+        else:
+            stats["pending"] += count
+    return stats
+
+
+def _empty_retrieval_message(
+    lang: str,
+    *,
+    pending: int,
+    completed: int,
+    raw_count: int,
+    valid_count: int,
+) -> tuple[str, str]:
+    """Return (message, reason_code) when no chunks are available for RAG."""
+    if pending > 0 and completed == 0:
+        msg = (
+            "Documents are still being processed. Please wait until processing completes before asking questions."
+            if lang == "en"
+            else "文档正在处理中，请等待处理完成后再提问。"
+        )
+        return msg, "processing"
+
+    if completed == 0:
+        msg = (
+            "No processed documents are available in this knowledge base. Please upload documents and wait for processing to finish."
+            if lang == "en"
+            else "知识库中还没有可用于问答的文档，请先上传并等待处理完成。"
+        )
+        return msg, "no_documents"
+
+    if pending > 0 and valid_count == 0 and raw_count == 0:
+        msg = (
+            "Some documents are still processing and no relevant content was retrieved yet. Please try again shortly."
+            if lang == "en"
+            else "部分文档仍在处理中，暂未检索到可用内容，请稍后再试。"
+        )
+        return msg, "processing_partial"
+
+    msg = (
+        "No relevant content was found in the knowledge base for this question. Try rephrasing or uploading more related documents."
+        if lang == "en"
+        else "未找到与问题相关的知识库内容，请尝试换一种问法，或上传更多相关文档。"
+    )
+    return msg, "no_match"
 
 
 def build_rag_prompt(
@@ -452,6 +513,33 @@ class RAGService:
             f"reranked_count={reranked_count}"
         )
 
+        if not chunks:
+            doc_stats = await _kb_doc_stats(db, knowledge_base_id)
+            no_evidence, empty_reason = _empty_retrieval_message(
+                lang,
+                pending=doc_stats["pending"],
+                completed=doc_stats["completed"],
+                raw_count=len(raw_chunks),
+                valid_count=len(valid_chunks),
+            )
+            yield {
+                "event": "retrieval_done",
+                "data": {
+                    "count": 0,
+                    "mode": _retrieval_mode(),
+                    "raw_count": len(raw_chunks),
+                    "valid_count": len(valid_chunks),
+                    "reranked_count": reranked_count,
+                    "empty_reason": empty_reason,
+                    "pending_docs": doc_stats["pending"],
+                    "completed_docs": doc_stats["completed"],
+                },
+            }
+            yield {"event": "token", "data": {"content": no_evidence}}
+            yield {"event": "references", "data": []}
+            yield {"event": "done", "data": {"empty_reason": empty_reason}}
+            return
+
         yield {
             "event": "retrieval_done",
             "data": {
@@ -463,16 +551,14 @@ class RAGService:
             },
         }
 
-        if not chunks:
-            no_evidence = (
-                "The knowledge base does not contain enough evidence to answer this question. "
-                "Try uploading more relevant documents or rephrasing your question."
-                if lang == "en"
-                else "当前知识库中没有找到足够依据，无法回答该问题。请尝试上传更多相关文档，或换个方式提问。"
-            )
-            yield {"event": "token", "data": {"content": no_evidence}}
-            yield {"event": "references", "data": []}
-            yield {"event": "done", "data": {}}
+        if not (settings.LLM_API_KEY or "").strip():
+            yield {
+                "event": "error",
+                "data": error_response(
+                    ErrorCode.LLM_GENERATION_FAILED,
+                    "LLM API key is not configured. Set LLM_API_KEY in environment.",
+                ),
+            }
             return
 
         # Step 4: Build prompt

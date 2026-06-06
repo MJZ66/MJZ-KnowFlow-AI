@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Trash2, MessageSquare, FileText, BookOpen, Search,
-  User, Bot, PanelRightClose, PanelRightOpen, Loader2, Hash, List,
+  User, Bot, PanelRightClose, PanelRightOpen, Loader2, Hash, List, Eye,
 } from 'lucide-react';
 import AppPageHeader from '../components/AppPageHeader';
 import IconActionButton from '../components/IconActionButton';
@@ -79,8 +79,13 @@ export default function KBDetailPage() {
     setRefsSheetOpen(false);
   };
 
-  const loadDocs = useCallback(async (page = 0, search = docSearch, status = docStatusFilter) => {
-    setDocLoading(true);
+  const loadDocs = useCallback(async (
+    page = 0,
+    search = docSearch,
+    status = docStatusFilter,
+    options?: { silent?: boolean },
+  ) => {
+    if (!options?.silent) setDocLoading(true);
     try {
       const skip = page * DOC_PAGE_SIZE;
       const params = new URLSearchParams({
@@ -121,7 +126,10 @@ export default function KBDetailPage() {
   useEffect(() => {
     const hasProcessing = documents.some((d) => !['completed', 'failed'].includes(d.status));
     if (!hasProcessing) return;
-    const interval = setInterval(() => void loadDocs(docPage), 3000);
+    const interval = setInterval(
+      () => void loadDocs(docPage, docSearch, docStatusFilter, { silent: true }),
+      3000,
+    );
     return () => clearInterval(interval);
   }, [documents, loadDocs, docPage]);
 
@@ -136,6 +144,14 @@ export default function KBDetailPage() {
   const handleUploaded = (doc: DocType) => {
     setDocuments((prev) => [doc, ...prev.filter((d) => d.id !== doc.id)]);
     setDocTotal((n) => n + 1);
+    toast(t('document.uploadSuccess'), 'success');
+  };
+
+  const handleOpenPreview = (docId: number) => {
+    setPreviewDocId(docId);
+    setPreviewChunkId(null);
+    setPreviewChunkIndex(null);
+    setPreviewOpen(true);
   };
 
   const handleDeleteDoc = async (docId: number) => {
@@ -462,23 +478,34 @@ export default function KBDetailPage() {
                           {formatSize(doc.file_size)} · {relativeTime(doc.created_at)}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteDoc(doc.id)}
-                        disabled={deletingDocId === doc.id}
-                        className={`p-1 shrink-0 transition-all ${
-                          deletingDocId === doc.id
-                            ? 'text-red-400/70 cursor-wait'
-                            : 'text-surface-600 hover:text-red-400 active:scale-90'
-                        }`}
-                        title={t('common.delete')}
-                      >
-                        {deletingDocId === doc.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          data-testid={`doc-preview-${doc.id}`}
+                          onClick={() => handleOpenPreview(doc.id)}
+                          className="p-1 text-surface-600 hover:text-brand-400 active:scale-90 transition-all"
+                          title={t('document.preview')}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteDoc(doc.id)}
+                          disabled={deletingDocId === doc.id}
+                          className={`p-1 transition-all ${
+                            deletingDocId === doc.id
+                              ? 'text-red-400/70 cursor-wait'
+                              : 'text-surface-600 hover:text-red-400 active:scale-90'
+                          }`}
+                          title={t('common.delete')}
+                        >
+                          {deletingDocId === doc.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                       <DocumentStatusBadge status={doc.status} />

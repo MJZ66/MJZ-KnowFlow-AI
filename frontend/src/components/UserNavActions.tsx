@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, User } from 'lucide-react';
+import { Settings, User, Wrench } from 'lucide-react';
 import { useUserStore } from '../stores/userStore';
 import LogoutButton from './LogoutButton';
 
@@ -13,6 +13,15 @@ export default function UserNavActions() {
 
   return (
     <>
+      <button
+        type="button"
+        data-testid="nav-setup"
+        onClick={() => navigate('/setup')}
+        className="btn-ghost p-2"
+        title={t('setup.navTitle')}
+      >
+        <Wrench className="w-4 h-4" />
+      </button>
       <button
         type="button"
         data-testid="nav-account"
